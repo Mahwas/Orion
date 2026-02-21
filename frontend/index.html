@@ -67,23 +67,28 @@
             </div>
         </header>
 
-        <section class="add-transaction">
-            <h3>Add New Transaction</h3>
-            <form id="transaction-form">
+        <section class="bank-accounts">
+            <h3>Bank Accounts</h3>
+            <ul id="bank-list" class="bank-list">
+                <!-- Banks will be injected here via JS -->
+            </ul>
+            <h3 style="margin-top: 20px; border-top: 1px solid var(--glass-border); padding-top: 20px;">Add New Bank
+                Account</h3>
+            <form id="bank-form">
                 <div class="form-group">
-                    <label for="text">Description</label>
-                    <input type="text" id="text" placeholder="Enter description..." required autocomplete="off">
+                    <label for="bank-name">Bank Name</label>
+                    <input type="text" id="bank-name" placeholder="e.g. Chase Checkings..." required autocomplete="off">
                 </div>
                 <div class="form-group">
-                    <label for="amount">Amount <small>(negative for expense, positive for income)</small></label>
-                    <input type="number" id="amount" placeholder="Enter amount..." required step="0.01">
+                    <label for="bank-balance">Initial Balance</label>
+                    <input type="number" id="bank-balance" placeholder="Enter balance..." required step="0.01">
                 </div>
-                <button type="submit" class="btn">Add Transaction</button>
+                <button type="submit" class="btn">Add Bank Account</button>
             </form>
         </section>
 
         <section class="history">
-            <h3>History</h3>
+            <h3 id="history-title">History</h3>
             <ul id="list" class="transaction-list">
                 <!-- Transactions will be injected here via JS -->
             </ul>

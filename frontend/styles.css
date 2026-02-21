@@ -367,7 +367,8 @@ input[type="number"] {
     margin-top: 30px;
 }
 
-.transaction-list {
+.transaction-list,
+.bank-list {
     list-style: none;
     max-height: 250px;
     overflow-y: auto;
@@ -375,21 +376,25 @@ input[type="number"] {
 }
 
 /* Custom Scrollbar for list */
-.transaction-list::-webkit-scrollbar {
+.transaction-list::-webkit-scrollbar,
+.bank-list::-webkit-scrollbar {
     width: 6px;
 }
 
-.transaction-list::-webkit-scrollbar-track {
+.transaction-list::-webkit-scrollbar-track,
+.bank-list::-webkit-scrollbar-track {
     background: rgba(255, 255, 255, 0.02);
     border-radius: 10px;
 }
 
-.transaction-list::-webkit-scrollbar-thumb {
+.transaction-list::-webkit-scrollbar-thumb,
+.bank-list::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.1);
     border-radius: 10px;
 }
 
-.transaction-list li {
+.transaction-list li,
+.bank-list li {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--glass-border);
     border-radius: 12px;
@@ -401,6 +406,15 @@ input[type="number"] {
     position: relative;
     transition: all 0.3s ease;
     animation: slideIn 0.3s ease-out;
+}
+
+.bank-list li {
+    cursor: pointer;
+}
+
+.bank-list li.active-bank {
+    border-color: var(--accent-primary);
+    background: rgba(99, 102, 241, 0.15);
 }
 
 @keyframes slideIn {
@@ -415,15 +429,18 @@ input[type="number"] {
     }
 }
 
-.transaction-list li:hover {
+.transaction-list li:hover,
+.bank-list li:hover {
     background: rgba(255, 255, 255, 0.08);
 }
 
-.transaction-list li.plus {
+.transaction-list li.plus,
+.bank-list li.plus {
     border-left: 4px solid var(--accent-income);
 }
 
-.transaction-list li.minus {
+.transaction-list li.minus,
+.bank-list li.minus {
     border-left: 4px solid var(--accent-expense);
 }
 
@@ -440,7 +457,8 @@ input[type="number"] {
     align-items: center;
 }
 
-.transaction-list li:hover .delete-btn {
+.transaction-list li:hover .delete-btn,
+.bank-list li:hover .delete-btn {
     opacity: 1;
 }
 
@@ -541,7 +559,7 @@ input[type="number"] {
         margin-top: 5px;
     }
 
-    .add-transaction {
+    .bank-accounts {
         grid-column: 1;
         grid-row: 2;
         padding-right: 60px;
@@ -588,7 +606,8 @@ input[type="number"] {
         margin-top: auto;
     }
 
-    .transaction-list {
+    .transaction-list,
+    .bank-list {
         max-height: none;
         flex: 1;
         overflow: visible;
@@ -596,7 +615,8 @@ input[type="number"] {
         padding-right: 0;
     }
 
-    .transaction-list li {
+    .transaction-list li,
+    .bank-list li {
         padding: 18px 25px;
         font-size: 1.15rem;
         margin-bottom: 15px;
