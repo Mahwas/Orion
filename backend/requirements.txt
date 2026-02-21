@@ -1,6 +1,11 @@
 fastapi
 uvicorn
 pydantic
-openai
-stripe
+google-generativeai
 python-dotenv
+langgraph
+langchain-core
+langchain-google-genai
+langchain-community
+duckduckgo-search
+sqlalchemy

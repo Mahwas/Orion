@@ -1,0 +1,46 @@
+[
+    {
+        "user_id": "u123",
+        "monthly_income": 4500.0,
+        "current_balance": 1850.25,
+        "buying_behavior": "Frequent tech shopper, usually buys gadgets on weekends. Budget conscious but prone to impulse electronic purchases.",
+        "discretionary_budget": 450.0,
+        "monthly_fixed_costs": 1500.0,
+        "days_until_payday": 14,
+        "upcoming_bills_total": 800.0,
+        "monthly_savings_goal": 500.0,
+        "recent_large_purchases": [
+            "Smart Speaker"
+        ],
+        "has_credit_card_debt": true
+    },
+    {
+        "user_id": "u124",
+        "monthly_income": 3200.0,
+        "current_balance": 450.0,
+        "buying_behavior": "Conservative spender, rarely buys non-essentials. Currently saving for a car deposit.",
+        "discretionary_budget": 50.0,
+        "monthly_fixed_costs": 1000.0,
+        "days_until_payday": 3,
+        "upcoming_bills_total": 350.0,
+        "monthly_savings_goal": 800.0,
+        "recent_large_purchases": [],
+        "has_credit_card_debt": false
+    },
+    {
+        "user_id": "u125",
+        "monthly_income": 8000.0,
+        "current_balance": 12400.0,
+        "buying_behavior": "High income, luxury shopper. Frequently buys designer clothing and high-end home decor. Not very budget constrained.",
+        "discretionary_budget": 2000.0,
+        "monthly_fixed_costs": 3500.0,
+        "days_until_payday": 20,
+        "upcoming_bills_total": 1200.0,
+        "monthly_savings_goal": 1500.0,
+        "recent_large_purchases": [
+            "Designer Shoes",
+            "Espresso Machine"
+        ],
+        "has_credit_card_debt": false
+    }
+]
