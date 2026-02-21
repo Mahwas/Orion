@@ -35,7 +35,7 @@ You also receive the original product the user wanted to buy.
 Your job: Find the single BEST candidate from the list that is:
 1. In the same category / serves the same purpose as the original product
 2. Cheaper than the original "price" field
-3. A real, purchasable product with a title and extracted_price
+3. A real, purchasable product with a title, extracted_price, and product_link
 
 Return strictly JSON:
 {
@@ -44,7 +44,7 @@ Return strictly JSON:
   "reason": "Short explanation of why this is viable, or why nothing viable was found"
 }
 
-Use "extracted_price" as the price value in your output. Use "product_link" as the url.
+Use "extracted_price" as the price value in your output. Use "product_link" as the url value.
 If no result meets all 3 criteria, set "is_viable": false and "best_candidate": null.
 """
 
@@ -74,5 +74,5 @@ When explaining your `reasoning`, directly cite their financial context (e.g., "
 Output JSON MUST contain:
 - "verdict": "BUY", "ALTERNATIVE_RECOMMENDED", or "DO_NOT_BUY"
 - "reasoning": "Clear explanation citing the user's deep financial state."
-- "similar_products_found": [ {"title": "...", "price": ...} ] (Populate this if you suggest an alternative, otherwise empty list).
+- "similar_products_found": [ {"title": "...", "price": 99.99, "url": "https://..."} ] (Populate this if you suggest an alternative. You MUST INCLUDE the url field if the alternative has one. If no alternatives, provide an empty list).
 """
