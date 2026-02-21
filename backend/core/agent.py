@@ -113,7 +113,7 @@ async def node_evaluate_alternative(state: AgentState):
     """
     if not os.getenv("GOOGLE_API_KEY"):
         # Mock: pretend we found something reasonable
-        return {"best_candidate": {"title": f"Budget {state['product_data'].product_title}", "price": state['product_data'].price * 0.6, "url": None}, "is_better": None}
+        return {"best_candidate": {"title": f"Budget {state['product_data'].product_title}", "price": state['product_data'].price * 0.6, "url": "https://example.com/mock-product"}, "is_better": None}
 
     prompt = f"""
 Original Product: {state['product_data'].model_dump_json()}
@@ -156,7 +156,7 @@ async def node_synthesize(state: AgentState):
         return {"final_decision": AnalysisResult(
             verdict="ALTERNATIVE_RECOMMENDED",
             reasoning="You can save money buying this alternative.",
-            similar_products_found=[AlternativeProduct(title=alt.get("title", "Alternative"), price=alt.get("price", 0))]
+            similar_products_found=[AlternativeProduct(title=alt.get("title", "Alternative"), price=alt.get("price", 0), url=alt.get("url"))]
         )}
 
     error_context = ""
