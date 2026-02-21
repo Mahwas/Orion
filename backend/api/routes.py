@@ -1,3 +1,4 @@
+from fastapi import APIRouter
 from models import PurchaseContext, DecisionOutput, FeedbackEvent, FinancialSnapshot, BudgetMemoryPreferences, BudgetMemoryLearningWeights, BudgetMemory
 from typing import Dict, Any
 from core.agent import evaluate_purchase

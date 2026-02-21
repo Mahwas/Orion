@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orion - Shopping Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">Orion</span>
+            </div>
+        </header>
+
+        <main id="main-content">
+            <!-- Waiting State -->
+            <div id="waiting-state" class="state">
+                <div class="waiting-icon">🛒</div>
+                <p class="waiting-text">Browse normally. We'll help when you're about to checkout.</p>
+                <span class="hint">Click the Orion icon anytime to view settings</span>
+            </div>
+
+            <!-- Intervention State -->
+            <div id="intervention-state" class="state hidden">
+                <span class="status-badge">Purchase Detected</span>
+                <div class="alert-icon">⚠️</div>
+                <h2>Pause before you buy</h2>
+                
+                <div class="product-card">
+                    <div class="product-info">
+                        <p class="product-title" id="product-title">Product Name</p>
+                        <p class="product-merchant" id="product-merchant">merchant.com</p>
+                    </div>
+                    <div class="product-price" id="product-price">$0.00</div>
+                </div>
+
+                <div class="advice-box">
+                    <h3>Consider this</h3>
+                    <ul id="advice-list">
+                        <li>Do you really need this right now?</li>
+                        <li>Is this within your budget?</li>
+                        <li>Have you waited 24 hours to think?</li>
+                    </ul>
+                </div>
+
+                <div class="budget-reminder">
+                    <span class="budget-icon">🎯</span>
+                    <span id="budget-text">Remember your savings goal!</span>
+                </div>
+
+                <div class="divider-line"></div>
+
+                <div class="actions">
+                    <button id="btn-cancel" class="btn btn-cancel">Cancel Purchase</button>
+                    <button id="btn-proceed" class="btn btn-proceed">I'll Think About It</button>
+                </div>
+            </div>
+
+            <!-- Settings State -->
+            <div id="settings-state" class="state hidden">
+                <h2>Settings</h2>
+                
+                <div class="settings-section">
+                    <label class="settings-label" for="budget-input">Monthly Budget</label>
+                    <div class="input-group">
+                        <span class="input-prefix" id="currency-symbol">$</span>
+                        <input type="number" id="budget-input" class="settings-input" placeholder="500" min="0" step="10">
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <label class="settings-label" for="currency-select">Currency</label>
+                    <select id="currency-select" class="settings-select">
+                        <option value="USD">USD ($)</option>
+                        <option value="EUR">EUR (€)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="JPY">JPY (¥)</option>
+                        <option value="CAD">CAD ($)</option>
+                        <option value="AUD">AUD ($)</option>
+                    </select>
+                </div>
+
+                <div class="settings-section">
+                    <label class="settings-label toggle-label">
+                        <span>Enable Notifications</span>
+                        <input type="checkbox" id="notifications-toggle" class="toggle-input" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-section">
+                    <label class="settings-label" for="dashboard-url">Dashboard URL</label>
+                    <input type="url" id="dashboard-url" class="settings-input" placeholder="http://localhost:3000">
+                </div>
+
+                <div class="actions">
+                    <button id="btn-save-settings" class="btn btn-save">Save Settings</button>
+                    <button id="btn-back" class="btn btn-back">Back</button>
+                </div>
+            </div>
+
+            <!-- Cancelled/Savings State -->
+            <div id="cancelled-state" class="state hidden">
+                <div class="success-icon">🎉</div>
+                <h2>Great Decision!</h2>
+                
+                <div class="savings-message">
+                    <span class="savings-amount" id="saved-amount">$0.00</span>
+                    <span class="savings-label">Potential Savings</span>
+                </div>
+                
+                <p>Your wallet thanks you.</p>
+                <p class="subtext">Keep up the great financial decisions!</p>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <a href="#" id="dashboard-link">Dashboard</a>
+            <span class="divider">|</span>
+            <a href="#" id="settings-link">Settings</a>
+            <span class="divider">|</span>
+            <span class="powered">Orion AI</span>
+        </footer>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

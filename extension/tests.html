@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Orion Extension Tests</title>
+    <style>
+        body { font-family: monospace; padding: 20px; max-width: 1200px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        .error { color: red; font-weight: bold; }
+        .summary { margin-top: 20px; padding: 10px; background: #f0f0f0; font-size: 1.2em; }
+        h2 { margin-top: 30px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+        h3 { margin-top: 20px; color: #333; }
+    </style>
+</head>
+<body>
+    <h1>Orion Extension Tests</h1>
+    <div id="results"></div>
+    <div id="summary" class="summary"></div>
+
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            document.getElementById('results').innerHTML += `<div class="error">Script Error: ${msg} at line ${line}</div>`;
+            return true;
+        };
+    </script>
+    <script src="content.js"></script>
+    <script>
+        const results = document.getElementById('results');
+        const summary = document.getElementById('summary');
+        let passed = 0;
+        let failed = 0;
+
+        if (typeof window.Orion === 'undefined') {
+            results.innerHTML = '<div class="error">ERROR: window.Orion is not defined. content.js may have a syntax error.</div>';
+        } else {
+            results.innerHTML += '<div style="color:green; margin-bottom:20px;">✓ Orion loaded successfully</div>';
+        }
+
+        function test(name, fn) {
+            try {
+                fn();
+                results.innerHTML += `<div class="pass">✓ ${name}</div>`;
+                passed++;
+            } catch (e) {
+                results.innerHTML += `<div class="fail">✗ ${name}: ${e.message}</div>`;
+                failed++;
+            }
+        }
+
+        function expect(actual) {
+            return {
+                toBe: (expected) => {
+                    if (actual !== expected) throw new Error(`Expected ${expected}, got ${actual}`);
+                },
+                toBeTrue: () => {
+                    if (actual !== true) throw new Error(`Expected true, got ${actual}`);
+                },
+                toBeFalse: () => {
+                    if (actual !== false) throw new Error(`Expected false, got ${actual}`);
+                },
+                toBeGreaterThan: (expected) => {
+                    if (actual <= expected) throw new Error(`Expected ${actual} > ${expected}`);
+                },
+                toBeDefined: () => {
+                    if (actual === undefined) throw new Error(`Expected value to be defined`);
+                },
+                toContain: (expected) => {
+                    if (!actual.includes(expected)) throw new Error(`Expected "${actual}" to contain "${expected}"`);
+                },
+                toBeNull: () => {
+                    if (actual !== null) throw new Error(`Expected null, got ${actual}`);
+                }
+            };
+        }
+
+        function describe(name, fn) {
+            results.innerHTML += `<h2>${name}</h2>`;
+            fn();
+        }
+
+        // Save original location getters
+        const origLocation = window.location;
+        let mockLocation = { href: 'https://example.com/', pathname: '/' };
+
+        // Create a mock location proxy
+        function createLocationProxy(href, pathname) {
+            return new Proxy({}, {
+                get: function(target, prop) {
+                    if (prop === 'href') return href;
+                    if (prop === 'pathname') return pathname;
+                    if (prop === 'hostname') return new URL(href).hostname;
+                    if (prop === 'toLowerCase') return function() { return href.toLowerCase(); };
+                    return origLocation[prop];
+                }
+            });
+        }
+
+        function setLocation(href, pathname) {
+            mockLocation = { href, pathname };
+            window.location = createLocationProxy(href, pathname);
+        }
+
+        function resetLocation() {
+            window.location = origLocation;
+        }
+
+        if (window.Orion) {
+        // ============================================
+        // isCheckoutPage Tests
+        // ============================================
+        describe('isCheckoutPage', () => {
+            test('detects /checkout in URL', () => {
+                setLocation('https://example.com/checkout', '/checkout');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects /cart in URL', () => {
+                setLocation('https://example.com/cart', '/cart');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects /payment in URL', () => {
+                setLocation('https://example.com/payment', '/payment');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects /order in URL', () => {
+                setLocation('https://example.com/order/review', '/order/review');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects /billing in URL', () => {
+                setLocation('https://example.com/billing', '/billing');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects /shipping in URL', () => {
+                setLocation('https://example.com/shipping', '/shipping');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects German "warenkorb"', () => {
+                setLocation('https://example.de/warenkorb', '/warenkorb');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects German "winkelwagen"', () => {
+                setLocation('https://example.nl/winkelwagen', '/winkelwagen');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects French "panier"', () => {
+                setLocation('https://example.fr/panier', '/panier');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects Spanish "carrito"', () => {
+                setLocation('https://example.es/carrito', '/carrito');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects British "basket"', () => {
+                setLocation('https://example.co.uk/basket', '/basket');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('returns false for product pages', () => {
+                setLocation('https://example.com/product/123', '/product/123');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+
+            test('returns false for homepage', () => {
+                setLocation('https://example.com/', '/');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+
+            test('returns false for category pages', () => {
+                setLocation('https://example.com/category/electronics', '/category/electronics');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+
+            test('returns false for search pages', () => {
+                setLocation('https://example.com/search?q=test', '/search');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+
+            test('is case insensitive', () => {
+                setLocation('https://example.com/CHECKOUT', '/CHECKOUT');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+        });
+
+        // ============================================
+        // isCheckoutKeyword Tests
+        // ============================================
+        describe('isCheckoutKeyword', () => {
+            test('detects "checkout"', () => {
+                expect(window.Orion.isCheckoutKeyword('checkout')).toBeTrue();
+                expect(window.Orion.isCheckoutKeyword('Checkout')).toBeTrue();
+                expect(window.Orion.isCheckoutKeyword('CHECKOUT')).toBeTrue();
+            });
+
+            test('detects "buy now"', () => {
+                expect(window.Orion.isCheckoutKeyword('Buy Now')).toBeTrue();
+                expect(window.Orion.isCheckoutKeyword('buy now')).toBeTrue();
+            });
+
+            test('detects "purchase"', () => {
+                expect(window.Orion.isCheckoutKeyword('Purchase')).toBeTrue();
+                expect(window.Orion.isCheckoutKeyword('Purchase Now')).toBeTrue();
+            });
+
+            test('detects "place order"', () => {
+                expect(window.Orion.isCheckoutKeyword('Place Order')).toBeTrue();
+                expect(window.Orion.isCheckoutKeyword('place order')).toBeTrue();
+            });
+
+            test('detects "complete order"', () => {
+                expect(window.Orion.isCheckoutKeyword('Complete Order')).toBeTrue();
+            });
+
+            test('detects "pay now"', () => {
+                expect(window.Orion.isCheckoutKeyword('Pay Now')).toBeTrue();
+            });
+
+            test('detects "make payment"', () => {
+                expect(window.Orion.isCheckoutKeyword('Make Payment')).toBeTrue();
+            });
+
+            test('detects "secure checkout"', () => {
+                expect(window.Orion.isCheckoutKeyword('Secure Checkout')).toBeTrue();
+            });
+
+            test('detects "proceed to payment"', () => {
+                expect(window.Orion.isCheckoutKeyword('Proceed to Payment')).toBeTrue();
+            });
+
+            test('detects "finish checkout"', () => {
+                expect(window.Orion.isCheckoutKeyword('Finish Checkout')).toBeTrue();
+            });
+
+            test('detects "order" alone', () => {
+                expect(window.Orion.isCheckoutKeyword('Order')).toBeTrue();
+            });
+
+            test('detects "pay" alone', () => {
+                expect(window.Orion.isCheckoutKeyword('Pay')).toBeTrue();
+            });
+
+            test('detects "continue to payment"', () => {
+                expect(window.Orion.isCheckoutKeyword('Continue to Payment')).toBeTrue();
+            });
+
+            test('detects "submit order"', () => {
+                expect(window.Orion.isCheckoutKeyword('Submit Order')).toBeTrue();
+            });
+
+            test('returns false for "Add to Cart"', () => {
+                expect(window.Orion.isCheckoutKeyword('Add to Cart')).toBeFalse();
+            });
+
+            test('returns false for "Continue Shopping"', () => {
+                expect(window.Orion.isCheckoutKeyword('Continue Shopping')).toBeFalse();
+            });
+
+            test('returns false for "Save for Later"', () => {
+                expect(window.Orion.isCheckoutKeyword('Save for Later')).toBeFalse();
+            });
+
+            test('returns false for "Update Cart"', () => {
+                expect(window.Orion.isCheckoutKeyword('Update Cart')).toBeFalse();
+            });
+
+            test('returns false for empty string', () => {
+                expect(window.Orion.isCheckoutKeyword('')).toBeFalse();
+            });
+
+            test('returns false for null', () => {
+                expect(window.Orion.isCheckoutKeyword(null)).toBeFalse();
+            });
+
+            test('returns false for undefined', () => {
+                expect(window.Orion.isCheckoutKeyword(undefined)).toBeFalse();
+            });
+        });
+
+        // ============================================
+        // shouldInterceptForm Tests
+        // ============================================
+        describe('shouldInterceptForm', () => {
+            test('detects form with checkout in action', () => {
+                const form = document.createElement('form');
+                form.action = '/checkout/submit';
+                document.body.appendChild(form);
+                expect(window.Orion.shouldInterceptForm(form)).toBeTrue();
+                document.body.removeChild(form);
+            });
+
+            test('detects form with order in action', () => {
+                const form = document.createElement('form');
+                form.action = '/order/complete';
+                document.body.appendChild(form);
+                expect(window.Orion.shouldInterceptForm(form)).toBeTrue();
+                document.body.removeChild(form);
+            });
+
+            test('detects form with payment in action', () => {
+                const form = document.createElement('form');
+                form.action = '/payment/process';
+                document.body.appendChild(form);
+                expect(window.Orion.shouldInterceptForm(form)).toBeTrue();
+                document.body.removeChild(form);
+            });
+
+            test('detects form with checkout in id', () => {
+                const form = document.createElement('form');
+                form.id = 'checkout-form';
+                document.body.appendChild(form);
+                expect(window.Orion.shouldInterceptForm(form)).toBeTrue();
+                document.body.removeChild(form);
+            });
+
+            test('detects form with payment in class', () => {
+                const form = document.createElement('form');
+                form.className = 'payment-form';
+                document.body.appendChild(form);
+                expect(window.Orion.shouldInterceptForm(form)).toBeTrue();
+                document.body.removeChild(form);
+            });
+
+            test('detects form with checkout in name', () => {
+                const form = document.createElement('form');
+                form.name = 'checkoutForm';
+                document.body.appendChild(form);
+                expect(window.Orion.shouldInterceptForm(form)).toBeTrue();
+                document.body.removeChild(form);
+            });
+
+            test('detects form with checkout submit button', () => {
+                const form = document.createElement('form');
+                const button = document.createElement('button');
+                button.type = 'submit';
+                button.textContent = 'Complete Order';
+                form.appendChild(button);
+                document.body.appendChild(form);
+                expect(window.Orion.shouldInterceptForm(form)).toBeTrue();
+                document.body.removeChild(form);
+            });
+
+            test('detects form with "Pay Now" button', () => {
+                const form = document.createElement('form');
+                const button = document.createElement('button');
+                button.type = 'submit';
+                button.textContent = 'Pay Now';
+                form.appendChild(button);
+                document.body.appendChild(form);
+                expect(window.Orion.shouldInterceptForm(form)).toBeTrue();
+                document.body.removeChild(form);
+            });
+
+            test('detects form with input submit', () => {
+                const form = document.createElement('form');
+                const input = document.createElement('input');
+                input.type = 'submit';
+                input.value = 'Place Order';
+                form.appendChild(input);
+                document.body.appendChild(form);
+                expect(window.Orion.shouldInterceptForm(form)).toBeTrue();
+                document.body.removeChild(form);
+            });
+
+            test('returns false for login forms', () => {
+                const form = document.createElement('form');
+                form.action = '/login';
+                document.body.appendChild(form);
+                expect(window.Orion.shouldInterceptForm(form)).toBeFalse();
+                document.body.removeChild(form);
+            });
+
+            test('returns false for search forms', () => {
+                const form = document.createElement('form');
+                form.action = '/search';
+                document.body.appendChild(form);
+                expect(window.Orion.shouldInterceptForm(form)).toBeFalse();
+                document.body.removeChild(form);
+            });
+
+            test('returns false for newsletter forms', () => {
+                const form = document.createElement('form');
+                form.action = '/newsletter/signup';
+                document.body.appendChild(form);
+                expect(window.Orion.shouldInterceptForm(form)).toBeFalse();
+                document.body.removeChild(form);
+            });
+        });
+
+        // ============================================
+        // findCheckoutButtons Tests
+        // ============================================
+        describe('findCheckoutButtons', () => {
+            test('detects checkout button by text', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Checkout Now';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects buy now button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Buy Now';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects purchase button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Purchase';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects place order button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Place Order';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects pay now button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Pay Now';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects Apple Pay button', () => {
+                const btn = document.createElement('button');
+                btn.className = 'apple-pay-button';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects Google Pay button', () => {
+                const btn = document.createElement('button');
+                btn.className = 'google-pay-button';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects PayPal button', () => {
+                const btn = document.createElement('button');
+                btn.className = 'paypal-button';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects button by id containing checkout', () => {
+                const btn = document.createElement('button');
+                btn.id = 'checkout-button';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects button by id containing buy', () => {
+                const btn = document.createElement('button');
+                btn.id = 'btn-buy-now';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects button by data-testid', () => {
+                const btn = document.createElement('button');
+                btn.dataset.testid = 'checkout-button';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects submit input', () => {
+                const input = document.createElement('input');
+                input.type = 'submit';
+                input.value = 'Checkout';
+                document.body.appendChild(input);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(input);
+            });
+
+            test('does not detect add to cart button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Add to Cart';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(0);
+                document.body.removeChild(btn);
+            });
+
+            test('does not detect continue shopping button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Continue Shopping';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(0);
+                document.body.removeChild(btn);
+            });
+
+            test('does not return intercepted buttons', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Checkout';
+                btn.dataset.orionIntercepted = 'true';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(0);
+                document.body.removeChild(btn);
+            });
+
+            test('detects multiple checkout buttons', () => {
+                const btn1 = document.createElement('button');
+                btn1.textContent = 'Checkout';
+                document.body.appendChild(btn1);
+
+                const btn2 = document.createElement('button');
+                btn2.textContent = 'Buy Now';
+                document.body.appendChild(btn2);
+
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(2);
+                
+                document.body.removeChild(btn1);
+                document.body.removeChild(btn2);
+            });
+        });
+
+        // ============================================
+        // Platform URL Tests (Shopify, WooCommerce, Amazon, etc.)
+        // ============================================
+        describe('Platform URL Detection', () => {
+            // Shopify
+            test('detects Shopify /checkouts URL', () => {
+                setLocation('https://store.myshopify.com/2497406/checkouts/abc123', '/2497406/checkouts/abc123');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects Shopify order information URL', () => {
+                setLocation('https://store.myshopify.com/order/123/information', '/order/123/information');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            // WooCommerce
+            test('detects WooCommerce checkout/pay URL', () => {
+                setLocation('https://store.com/checkout/pay', '/checkout/pay');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects WooCommerce order-received URL', () => {
+                setLocation('https://store.com/checkout/order-received/123', '/checkout/order-received/123');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            // Amazon
+            test('detects Amazon /gp/buy URL', () => {
+                setLocation('https://www.amazon.com/gp/buy/payment/handlers/display.html', '/gp/buy/payment');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            // BigCommerce
+            test('detects BigCommerce checkout.php URL', () => {
+                setLocation('https://store.com/checkout.php', '/checkout.php');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            // Magento
+            test('detects Magento checkout/index URL', () => {
+                setLocation('https://store.com/checkout/index/index', '/checkout/index/index');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects Magento onestepcheckout URL', () => {
+                setLocation('https://store.com/onestepcheckout', '/onestepcheckout');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            // Squarespace
+            test('detects Squarespace commerce/checkout URL', () => {
+                setLocation('https://store.squarespace.com/commerce/checkout', '/commerce/checkout');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            // Wix
+            test('detects Wix checkout/step URL', () => {
+                setLocation('https://store.wixsite.com/checkout/step/1', '/checkout/step/1');
+                expect(window.Orion.isCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+        });
+
+        // ============================================
+        // Negative URL Pattern Tests (should NOT detect)
+        // ============================================
+        describe('Negative URL Patterns (Should NOT detect)', () => {
+            test('rejects /login URLs', () => {
+                setLocation('https://example.com/login', '/login');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+
+            test('rejects /signup URLs', () => {
+                setLocation('https://example.com/signup', '/signup');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+
+            test('rejects /register URLs', () => {
+                setLocation('https://example.com/register', '/register');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+
+            test('rejects /search URLs', () => {
+                setLocation('https://example.com/search?q=test', '/search');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+
+            test('rejects /password/reset URLs', () => {
+                setLocation('https://example.com/password/reset', '/password/reset');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+
+            test('rejects /account/settings URLs', () => {
+                setLocation('https://example.com/account/settings', '/account/settings');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+
+            test('rejects /wishlist URLs', () => {
+                setLocation('https://example.com/wishlist', '/wishlist');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+
+            test('rejects /favorites URLs', () => {
+                setLocation('https://example.com/favorites', '/favorites');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+
+            test('rejects /logout URLs', () => {
+                setLocation('https://example.com/logout', '/logout');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+
+            test('rejects /profile URLs', () => {
+                setLocation('https://example.com/profile', '/profile');
+                expect(window.Orion.isCheckoutPage()).toBeFalse();
+                resetLocation();
+            });
+        });
+
+        // ============================================
+        // Query Parameter Tests
+        // ============================================
+        describe('Query Parameter Detection', () => {
+            test('detects ?checkout=1 in URL', () => {
+                setLocation('https://example.com/product?checkout=1', '/product');
+                expect(window.Orion.hasCheckoutQueryParam()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects ?buy_now=1 in URL', () => {
+                setLocation('https://example.com/product?buy_now=1', '/product');
+                expect(window.Orion.hasCheckoutQueryParam()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects ?action=buy in URL', () => {
+                setLocation('https://example.com/product?action=buy', '/product');
+                expect(window.Orion.hasCheckoutQueryParam()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects #checkout in hash', () => {
+                setLocation('https://example.com/#checkout', '/');
+                expect(window.Orion.hasCheckoutQueryParam()).toBeTrue();
+                resetLocation();
+            });
+
+            test('detects #payment in hash', () => {
+                setLocation('https://example.com/#payment', '/');
+                expect(window.Orion.hasCheckoutQueryParam()).toBeTrue();
+                resetLocation();
+            });
+        });
+
+        // ============================================
+        // Cart Indicator Tests
+        // ============================================
+        describe('Cart Indicator Detection', () => {
+            test('detects .cart-count element', () => {
+                document.body.innerHTML = '<span class="cart-count">3</span>';
+                expect(window.Orion.hasCartIndicators()).toBeTrue();
+                document.body.innerHTML = '';
+            });
+
+            test('detects .basket-qty element', () => {
+                document.body.innerHTML = '<div class="basket-qty">5</div>';
+                expect(window.Orion.hasCartIndicators()).toBeTrue();
+                document.body.innerHTML = '';
+            });
+
+            test('detects [data-cart-count] attribute', () => {
+                document.body.innerHTML = '<span data-cart-count="2"></span>';
+                expect(window.Orion.hasCartIndicators()).toBeTrue();
+                document.body.innerHTML = '';
+            });
+
+            test('detects .mini-cart-qty element', () => {
+                document.body.innerHTML = '<div class="mini-cart-qty">1</div>';
+                expect(window.Orion.hasCartIndicators()).toBeTrue();
+                document.body.innerHTML = '';
+            });
+
+            test('detects .cart-badge element with positive count', () => {
+                document.body.innerHTML = '<span class="cart-badge">4</span>';
+                expect(window.Orion.hasCartIndicators()).toBeTrue();
+                document.body.innerHTML = '';
+            });
+
+            test('returns false for zero cart count', () => {
+                document.body.innerHTML = '<span class="cart-count">0</span>';
+                expect(window.Orion.hasCartIndicators()).toBeFalse();
+                document.body.innerHTML = '';
+            });
+
+            test('returns false when no cart indicators', () => {
+                document.body.innerHTML = '<div>No cart here</div>';
+                expect(window.Orion.hasCartIndicators()).toBeFalse();
+                document.body.innerHTML = '';
+            });
+        });
+
+        // ============================================
+        // Price Indicator Tests
+        // ============================================
+        describe('Price Indicator Detection', () => {
+            test('detects .price element', () => {
+                document.body.innerHTML = '<div class="price">$99.00</div>';
+                expect(window.Orion.hasPriceIndicators()).toBeTrue();
+                document.body.innerHTML = '';
+            });
+
+            test('detects [data-price] attribute', () => {
+                document.body.innerHTML = '<span data-price="49.99"></span>';
+                expect(window.Orion.hasPriceIndicators()).toBeTrue();
+                document.body.innerHTML = '';
+            });
+
+            test('detects .product-price element', () => {
+                document.body.innerHTML = '<div class="product-price">$19.99</div>';
+                expect(window.Orion.hasPriceIndicators()).toBeTrue();
+                document.body.innerHTML = '';
+            });
+
+            test('detects .order-total element', () => {
+                document.body.innerHTML = '<div class="order-total">$150.00</div>';
+                expect(window.Orion.hasPriceIndicators()).toBeTrue();
+                document.body.innerHTML = '';
+            });
+
+            test('returns false when no price indicators', () => {
+                document.body.innerHTML = '<div>No price here</div>';
+                expect(window.Orion.hasPriceIndicators()).toBeFalse();
+                document.body.innerHTML = '';
+            });
+        });
+
+        // ============================================
+        // Checkout Form Field Tests
+        // ============================================
+        describe('Checkout Form Field Detection', () => {
+            test('detects 2+ checkout fields', () => {
+                document.body.innerHTML = `
+                    <input name="email" />
+                    <input name="shipping[firstName]" />
+                `;
+                expect(window.Orion.hasCheckoutFormFields()).toBeTrue();
+                document.body.innerHTML = '';
+            });
+
+            test('detects email field', () => {
+                document.body.innerHTML = '<input name="email" />';
+                expect(window.Orion.hasCheckoutFormFields()).toBeTrue();
+                document.body.innerHTML = '';
+            });
+
+            test('returns false for single field', () => {
+                document.body.innerHTML = '<input name="search" />';
+                expect(window.Orion.hasCheckoutFormFields()).toBeFalse();
+                document.body.innerHTML = '';
+            });
+        });
+
+        // ============================================
+        // isLikelyCheckoutPage Integration Tests
+        // ============================================
+        describe('isLikelyCheckoutPage Integration', () => {
+            test('returns true for checkout URL', () => {
+                setLocation('https://example.com/checkout', '/checkout');
+                expect(window.Orion.isLikelyCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('returns true for cart URL with cart indicator', () => {
+                setLocation('https://example.com/cart', '/cart');
+                document.body.innerHTML = '<span class="cart-count">2</span>';
+                expect(window.Orion.isLikelyCheckoutPage()).toBeTrue();
+                document.body.innerHTML = '';
+                resetLocation();
+            });
+
+            test('returns true for product page with price + checkout fields', () => {
+                setLocation('https://example.com/product', '/product');
+                document.body.innerHTML = `
+                    <div class="price">$99</div>
+                    <input name="email" />
+                    <input name="shipping" />
+                `;
+                expect(window.Orion.isLikelyCheckoutPage()).toBeTrue();
+                document.body.innerHTML = '';
+                resetLocation();
+            });
+
+            test('returns true for URL with checkout query param', () => {
+                setLocation('https://example.com/product?checkout=1', '/product');
+                expect(window.Orion.isLikelyCheckoutPage()).toBeTrue();
+                resetLocation();
+            });
+
+            test('returns false for product page without any signals', () => {
+                setLocation('https://example.com/product/123', '/product/123');
+                document.body.innerHTML = '<h1>Product</h1>';
+                expect(window.Orion.isLikelyCheckoutPage()).toBeFalse();
+                document.body.innerHTML = '';
+                resetLocation();
+            });
+        });
+
+        // ============================================
+        // Advanced Button Detection Tests
+        // ============================================
+        describe('Advanced Button Detection', () => {
+            test('detects Express Checkout button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Express Checkout';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects Quick Checkout button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Quick Checkout';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects Guest Checkout button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Guest Checkout';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects "Continue" button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Continue';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects "Next" button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Next';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects "Review Order" button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Review Order';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects "Confirm Order" button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Confirm Order';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects Amazon Pay button', () => {
+                const btn = document.createElement('button');
+                btn.className = 'amazon-pay-button';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects button with [data-testid="checkout-button"]', () => {
+                const btn = document.createElement('button');
+                btn.dataset.testid = 'checkout-button';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('detects button with [name="checkout"]', () => {
+                const btn = document.createElement('button');
+                btn.name = 'checkout';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('does not detect "Add to Wishlist" button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Add to Wishlist';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(0);
+                document.body.removeChild(btn);
+            });
+
+            test('does not detect "Sign Up" button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Sign Up';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(0);
+                document.body.removeChild(btn);
+            });
+
+            test('does not detect "Login" button', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Login';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(0);
+                document.body.removeChild(btn);
+            });
+        });
+
+        // ============================================
+        // extractProductInfo Tests
+        // ============================================
+        describe('extractProductInfo', () => {
+            test('extracts title from #productTitle', () => {
+                const h1 = document.createElement('h1');
+                h1.id = 'productTitle';
+                h1.textContent = 'Test Product';
+                document.body.appendChild(h1);
+                
+                const product = window.Orion.extractProductInfo();
+                expect(product.title).toBe('Test Product');
+                
+                document.body.removeChild(h1);
+            });
+
+            test('extracts title from h1', () => {
+                const h1 = document.createElement('h1');
+                h1.textContent = 'Another Product';
+                document.body.appendChild(h1);
+                
+                const product = window.Orion.extractProductInfo();
+                expect(product.title).toBe('Another Product');
+                
+                document.body.removeChild(h1);
+            });
+
+            test('extracts merchant from hostname', () => {
+                setLocation('https://shop.example.com/product', '/product');
+                const product = window.Orion.extractProductInfo();
+                expect(product.merchant).toBe('shop');
+                resetLocation();
+            });
+
+            test('removes www from merchant', () => {
+                setLocation('https://www.example.com/product', '/product');
+                const product = window.Orion.extractProductInfo();
+                expect(product.merchant).toBe('example');
+                resetLocation();
+            });
+
+            test('removes checkout subdomain from merchant', () => {
+                setLocation('https://checkout.example.com/product', '/product');
+                const product = window.Orion.extractProductInfo();
+                expect(product.merchant).toBe('example');
+                resetLocation();
+            });
+
+            test('returns Unknown Product when no title found', () => {
+                document.body.innerHTML = '';
+                setLocation('https://example.com/', '/');
+                const product = window.Orion.extractProductInfo();
+                expect(product.title).toBe('Unknown Product');
+                resetLocation();
+            });
+
+            test('includes URL in product info', () => {
+                setLocation('https://example.com/checkout', '/checkout');
+                const product = window.Orion.extractProductInfo();
+                expect(product.url).toContain('checkout');
+                resetLocation();
+            });
+
+            test('includes timestamp', () => {
+                const product = window.Orion.extractProductInfo();
+                expect(product.timestamp).toBeDefined();
+            });
+
+            test('has currency field', () => {
+                const product = window.Orion.extractProductInfo();
+                expect(product.currency).toBeDefined();
+            });
+
+            test('has price field', () => {
+                const product = window.Orion.extractProductInfo();
+                expect(product.price).toBeDefined();
+            });
+        });
+
+        // ============================================
+        // extractPrice Tests
+        // ============================================
+        describe('extractPrice', () => {
+            test('extracts price from #priceblock_ourprice', () => {
+                const priceEl = document.createElement('span');
+                priceEl.id = 'priceblock_ourprice';
+                priceEl.textContent = '$49.99';
+                document.body.appendChild(priceEl);
+                
+                const price = window.Orion.extractPrice();
+                expect(price).toBe(49.99);
+                
+                document.body.removeChild(priceEl);
+            });
+
+            test('extracts price from .price element', () => {
+                const priceEl = document.createElement('div');
+                priceEl.className = 'price';
+                priceEl.textContent = '$129.00';
+                document.body.appendChild(priceEl);
+                
+                const price = window.Orion.extractPrice();
+                expect(price).toBe(129.00);
+                
+                document.body.removeChild(priceEl);
+            });
+
+            test('extracts price with comma separator', () => {
+                const priceEl = document.createElement('div');
+                priceEl.className = 'price';
+                priceEl.textContent = '$1,299.99';
+                document.body.appendChild(priceEl);
+                
+                const price = window.Orion.extractPrice();
+                expect(price).toBe(1299.99);
+                
+                document.body.removeChild(priceEl);
+            });
+
+            test('extracts price from Amazon price element', () => {
+                const priceEl = document.createElement('span');
+                priceEl.className = 'a-price-whole';
+                priceEl.textContent = '79';
+                document.body.appendChild(priceEl);
+                
+                const price = window.Orion.extractPrice();
+                expect(price).toBe(79);
+                
+                document.body.removeChild(priceEl);
+            });
+
+            test('returns null when no price element found', () => {
+                document.body.innerHTML = '';
+                const price = window.Orion.extractPrice();
+                expect(price).toBe(null);
+            });
+
+            test('handles price with no numeric value', () => {
+                const priceEl = document.createElement('div');
+                priceEl.className = 'price';
+                priceEl.textContent = 'Out of Stock';
+                document.body.appendChild(priceEl);
+                
+                const price = window.Orion.extractPrice();
+                expect(price).toBe(null);
+                
+                document.body.removeChild(priceEl);
+            });
+        });
+
+        // ============================================
+        // Robustness Tests
+        // ============================================
+        describe('Robustness Tests', () => {
+            test('handles null button text', () => {
+                const btn = document.createElement('button');
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                document.body.removeChild(btn);
+            });
+
+            test('handles empty button text', () => {
+                const btn = document.createElement('button');
+                btn.textContent = '';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                document.body.removeChild(btn);
+            });
+
+            test('handles form without action', () => {
+                const form = document.createElement('form');
+                document.body.appendChild(form);
+                const result = window.Orion.shouldInterceptForm(form);
+                document.body.removeChild(form);
+            });
+
+            test('handles form without id or name', () => {
+                const form = document.createElement('form');
+                form.action = '/test';
+                document.body.appendChild(form);
+                const result = window.Orion.shouldInterceptForm(form);
+                document.body.removeChild(form);
+            });
+
+            test('handles empty page (no elements)', () => {
+                document.body.innerHTML = '';
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(0);
+            });
+
+            test('handles isCheckoutKeyword with null', () => {
+                const result = window.Orion.isCheckoutKeyword(null);
+            });
+
+            test('handles isCheckoutKeyword with undefined', () => {
+                const result = window.Orion.isCheckoutKeyword(undefined);
+            });
+
+            test('handles special characters in button text', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Buy Now! @#$%';
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                document.body.removeChild(btn);
+            });
+
+            test('handles unicode in button text', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Купить сейчас'; // Russian "Buy Now"
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                document.body.removeChild(btn);
+            });
+
+            test('handles very long button text', () => {
+                const btn = document.createElement('button');
+                btn.textContent = 'A'.repeat(10000);
+                document.body.appendChild(btn);
+                const buttons = window.Orion.findCheckoutButtons();
+                document.body.removeChild(btn);
+            });
+
+            test('handles form with no submit button', () => {
+                const form = document.createElement('form');
+                form.action = '/checkout';
+                document.body.appendChild(form);
+                const result = window.Orion.shouldInterceptForm(form);
+                expect(result).toBeTrue();
+                document.body.removeChild(form);
+            });
+
+            test('handles nested forms', () => {
+                const outerForm = document.createElement('form');
+                outerForm.className = 'outer-form';
+                const innerForm = document.createElement('form');
+                innerForm.className = 'checkout-form';
+                outerForm.appendChild(innerForm);
+                document.body.appendChild(outerForm);
+                const result1 = window.Orion.shouldInterceptForm(outerForm);
+                const result2 = window.Orion.shouldInterceptForm(innerForm);
+                expect(result2).toBeTrue();
+                document.body.removeChild(outerForm);
+            });
+
+            test('handles dynamically added elements after initial scan', () => {
+                document.body.innerHTML = '';
+                let buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(0);
+
+                const btn = document.createElement('button');
+                btn.textContent = 'Buy Now';
+                document.body.appendChild(btn);
+                
+                // Manually call findCheckoutButtons again (simulating re-scan)
+                buttons = window.Orion.findCheckoutButtons();
+                expect(buttons.length).toBe(1);
+                
+                document.body.removeChild(btn);
+            });
+        });
+
+        // Summary
+        summary.innerHTML = `<strong>Results:</strong> ${passed} passed, ${failed} failed`;
+        console.log(`Tests completed: ${passed} passed, ${failed} failed`);
+        }
+    </script>
+</body>
+</html>
