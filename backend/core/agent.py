@@ -5,6 +5,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, END
 from langchain_community.tools import DuckDuckGoSearchResults
+from langchain_community.utilities import SerpAPIWrapper
 from models.schemas import UserData, ProductData, AnalysisResult, AlternativeProduct
 from core.prompts import TRIAGE_SYSTEM_PROMPT, SYNTHESIS_SYSTEM_PROMPT
 
@@ -55,8 +56,19 @@ ProductData: {state['product_data'].model_dump_json()}
     return {"triage_result": triage_data}
 
 async def node_search(state: AgentState):
-    """Uses DDGS tool to find similar or cheaper items."""
+    """Uses Google Shop Search (via SerpAPI) or DDGS tool to find similar or cheaper items."""
     query = f"cheap alternatives to {state['product_data'].product_title} price"
+    
+    serp_key = os.getenv("SERPAPI_API_KEY")
+    if serp_key:
+        try:
+            search = SerpAPIWrapper(search_engine="google", params={"tbm": "shop"}, serpapi_api_key=serp_key)
+            results = search.run(query)
+            return {"search_results": results}
+        except Exception as e:
+            print(f"Google Shop Search failed: {e}. Falling back to DuckDuckGo.")
+    
+    # Fallback to DuckDuckGo
     try:
         results = search_tool.invoke({"query": query})
     except Exception as e:
