@@ -1,0 +1,486 @@
+:root {
+    --bg-dark: #0f172a;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --glass-bg: rgba(30, 41, 59, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    --accent-income: #10b981;
+    --accent-expense: #ef4444;
+    --accent-primary: #6366f1;
+    --accent-primary-hover: #4f46e5;
+
+    --blob-1: #3b82f6;
+    --blob-2: #8b5cf6;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    /* Ensure the top doesn't get pushed out off-screen */
+    padding: 5vh 0;
+    /* Let it float a bit from top/bottom edges */
+    box-sizing: border-box;
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* Background Animations */
+.background-blobs {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    overflow: hidden;
+}
+
+.blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(100px);
+    opacity: 0.5;
+    animation: float 20s infinite ease-in-out alternate;
+}
+
+.blob-1 {
+    width: 400px;
+    height: 400px;
+    background: var(--blob-1);
+    top: -100px;
+    left: -100px;
+}
+
+.blob-2 {
+    width: 500px;
+    height: 500px;
+    background: var(--blob-2);
+    bottom: -150px;
+    right: -100px;
+    animation-delay: -5s;
+}
+
+@keyframes float {
+    0% {
+        transform: translate(0, 0) scale(1);
+    }
+
+    100% {
+        transform: translate(50px, 50px) scale(1.1);
+    }
+}
+
+/* Main Container */
+.container {
+    width: 90%;
+    max-width: 450px;
+    margin: 40px auto;
+    padding: 30px;
+    border-radius: 24px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    animation: fadeUp 0.8s ease-out;
+}
+
+@keyframes fadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+header h1 {
+    font-weight: 700;
+    font-size: 1.5rem;
+    margin-bottom: 24px;
+    text-align: center;
+    letter-spacing: 1px;
+    background: linear-gradient(to right, #fff, #94a3b8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.balance-container {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.balance-container h2 {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.balance-container h3 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 10px 0 20px;
+}
+
+.income-expense-cards {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.card {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 15px;
+    border-radius: 16px;
+    border: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.3s ease, background 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.card .label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+}
+
+.card .amount {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.income-card .amount {
+    color: var(--accent-income);
+}
+
+.expense-card .amount {
+    color: var(--accent-expense);
+}
+
+/* Forms */
+h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+}
+
+input {
+    width: 100%;
+    padding: 12px 15px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.btn {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: var(--accent-primary);
+    color: white;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 10px;
+}
+
+.btn:hover {
+    background: var(--accent-primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+/* History List */
+.history {
+    margin-top: 30px;
+}
+
+.transaction-list {
+    list-style: none;
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+/* Custom Scrollbar for list */
+.transaction-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.transaction-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+}
+
+.transaction-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.transaction-list li {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 12px 15px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    transition: all 0.3s ease;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.transaction-list li:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.transaction-list li.plus {
+    border-left: 4px solid var(--accent-income);
+}
+
+.transaction-list li.minus {
+    border-left: 4px solid var(--accent-expense);
+}
+
+.delete-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 5px;
+    opacity: 0;
+    transition: opacity 0.3s ease, color 0.3s ease;
+    position: absolute;
+    right: -10px;
+    transform: translateX(100%);
+}
+
+.transaction-list li:hover .delete-btn {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.delete-btn:hover {
+    color: var(--accent-expense);
+}
+
+.transaction-info {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.transaction-text {
+    font-weight: 500;
+}
+
+/* PC Fullscreen Dashboard Layout */
+@media (min-width: 1024px) {
+    .container {
+        max-width: 1200px;
+        width: 90vw;
+        min-height: 85vh;
+        /* Changes fixed height to dynamic minimum height */
+        margin: auto;
+        padding: 50px 60px;
+        display: grid;
+        grid-template-columns: 350px 1fr;
+        grid-template-rows: auto 1fr;
+        column-gap: 60px;
+        row-gap: 40px;
+        align-items: start;
+    }
+
+    header {
+        grid-column: 1 / -1;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--glass-border);
+        padding-bottom: 30px;
+        margin-bottom: 0px;
+    }
+
+    header h1 {
+        margin-bottom: 0;
+        font-size: 3rem;
+    }
+
+    .balance-container {
+        display: flex;
+        align-items: stretch;
+        gap: 20px;
+        margin-bottom: 0;
+    }
+
+    .total-balance {
+        background: rgba(255, 255, 255, 0.08);
+        /* slight highlight */
+        padding: 15px 30px;
+        border-radius: 16px;
+        border: 1px solid var(--glass-border);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .total-balance h2 {
+        font-size: 0.85rem;
+        margin-bottom: 8px;
+        text-align: center;
+    }
+
+    .total-balance h3 {
+        margin: 0;
+        font-size: 2rem;
+        text-align: center;
+    }
+
+    .income-expense-cards {
+        gap: 20px;
+    }
+
+    .card {
+        padding: 15px 25px;
+        justify-content: center;
+        min-width: 160px;
+    }
+
+    .card .amount {
+        font-size: 1.5rem;
+        margin-top: 5px;
+    }
+
+    .add-transaction {
+        grid-column: 1;
+        grid-row: 2;
+        padding-right: 60px;
+        border-right: 1px solid var(--glass-border);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .history {
+        grid-column: 2;
+        grid-row: 2;
+        margin-top: 0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        /* Removed overflow: hidden so content stretches the container */
+    }
+
+    h3 {
+        font-size: 1.4rem;
+        margin-bottom: 25px;
+        border-bottom: none;
+        padding-bottom: 0px;
+    }
+
+    .form-group {
+        margin-bottom: 25px;
+    }
+
+    label {
+        font-size: 1rem;
+        margin-bottom: 12px;
+    }
+
+    input {
+        padding: 16px;
+        font-size: 1.05rem;
+    }
+
+    .btn {
+        padding: 16px;
+        font-size: 1.1rem;
+        margin-top: auto;
+    }
+
+    .transaction-list {
+        max-height: none;
+        flex: 1;
+        overflow: visible;
+        /* Lets it expand the page */
+        padding-right: 0;
+    }
+
+    .transaction-list li {
+        padding: 18px 25px;
+        font-size: 1.15rem;
+        margin-bottom: 15px;
+    }
+}
