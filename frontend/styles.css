@@ -26,11 +26,9 @@ body {
     color: var(--text-primary);
     min-height: 100vh;
     display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    /* Ensure the top doesn't get pushed out off-screen */
-    padding: 5vh 0;
-    /* Let it float a bit from top/bottom edges */
+    flex-direction: column;
+    align-items: center;
+    padding: 0;
     box-sizing: border-box;
     overflow-x: hidden;
     position: relative;
@@ -82,11 +80,113 @@ body {
     }
 }
 
+/* Navbar */
+.navbar {
+    width: 90%;
+    max-width: 450px;
+    margin: 20px auto 0;
+    position: sticky;
+    top: 20px;
+    z-index: 100;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    animation: fadeUp 0.8s ease-out;
+}
+
+.nav-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 15px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand {
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.nav-brand .brand-text {
+    background: linear-gradient(to right, #fff, #94a3b8);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.nav-links {
+    display: flex;
+    list-style: none;
+    gap: 30px;
+}
+
+.nav-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 1rem;
+    transition: color 0.3s ease;
+    position: relative;
+}
+
+.nav-links a:hover,
+.nav-links a.active {
+    color: var(--text-primary);
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: -5px;
+    left: 0;
+    background-color: var(--accent-primary);
+    transition: width 0.3s ease;
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+    width: 100%;
+}
+
+.nav-profile {
+    display: flex;
+    align-items: center;
+}
+
+.profile-pic {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--accent-primary);
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    object-fit: cover;
+}
+
+.profile-pic:hover {
+    transform: scale(1.05);
+}
+
+@media (max-width: 768px) {
+    .nav-links {
+        display: none;
+    }
+}
+
 /* Main Container */
 .container {
     width: 90%;
     max-width: 450px;
-    margin: 40px auto;
+    margin: 20px auto 40px;
     padding: 30px;
     border-radius: 24px;
     backdrop-filter: blur(16px);
@@ -117,6 +217,7 @@ header h1 {
     letter-spacing: 1px;
     background: linear-gradient(to right, #fff, #94a3b8);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -347,12 +448,17 @@ input:focus {
 
 /* PC Fullscreen Dashboard Layout */
 @media (min-width: 1024px) {
+    .navbar {
+        width: 90vw;
+        max-width: 1200px;
+    }
+
     .container {
         max-width: 1200px;
         width: 90vw;
         min-height: 85vh;
         /* Changes fixed height to dynamic minimum height */
-        margin: auto;
+        margin: 20px auto 40px;
         padding: 50px 60px;
         display: grid;
         grid-template-columns: 350px 1fr;
