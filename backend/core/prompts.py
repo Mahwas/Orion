@@ -32,27 +32,29 @@ Each product has fields: "title", "extracted_price" (numeric), "rating", "review
 
 You also receive the original product the user wanted to buy.
 
-Your job: Find the single BEST candidate from the list that is:
+Your job: Find the TOP 2-4 viable candidates from the list that are:
 1. In the same category / serves the same purpose as the original product
 2. Cheaper than the original "price" field
-3. A real, purchasable product with a title, extracted_price, and product_link
+3. Real, purchasable products with a title, extracted_price, and product_link
 
 Return strictly JSON:
 {
   "is_viable": true | false,
-  "best_candidate": { "title": "...", "price": 99.99, "url": "..." } | null,
-  "reason": "Short explanation of why this is viable, or why nothing viable was found"
+  "viable_candidates": [
+    { "title": "...", "price": 99.99, "url": "..." }
+  ],
+  "reason": "Short explanation of why these are viable, or why nothing viable was found"
 }
 
 Use "extracted_price" as the price value in your output. Use "product_link" as the url value.
-If no result meets all 3 criteria, set "is_viable": false and "best_candidate": null.
+If no result meets all 3 criteria, set "is_viable": false and "viable_candidates": [].
 """
 
 COMPARE_PROMPT = """
 You are a financial comparison analyst for the 'Orion' financial assistant.
-You receive the original product the user wanted, a candidate alternative, and the user's financial profile.
+You receive the original product the user wanted, a list of candidate alternatives, and the user's financial profile.
 
-Your job: Decide if the alternative is GENUINELY BETTER for this specific user by weighing:
+Your job: Decide if the FIRST candidate in the list is GENUINELY BETTER for this specific user by weighing:
 - Price saving vs. potential feature trade-offs
 - Whether the saving is meaningful given their discretionary budget and financial situation
 - Whether the alternative meets the user's actual needs
@@ -60,14 +62,14 @@ Your job: Decide if the alternative is GENUINELY BETTER for this specific user b
 Return strictly JSON:
 {
   "is_better": true | false,
-  "reasoning": "Detailed explanation comparing old vs new, citing price difference and user's financial state",
+  "reasoning": "Detailed explanation comparing old vs the top new candidate, citing price difference and user's financial state",
   "selected_alternative": { "title": "...", "price": 99.99, "url": "..." } | null
 }
 """
 
 SYNTHESIS_SYSTEM_PROMPT = """
 You are the final decision-maker of the 'Orion' financial assistant.
-You receive the original ProductData, UserData, the triage analysis, and a validated alternative product.
+You receive the original ProductData, UserData, the triage analysis, and a list of validated alternative products.
 
 When explaining your `reasoning`, directly cite their financial context (e.g., "You have $X in upcoming bills", "You have credit card debt", or "Payday is still X days away").
 

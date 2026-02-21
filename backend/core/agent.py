@@ -24,7 +24,7 @@ class AgentState(TypedDict):
     product_data: ProductData
     triage_result: Optional[dict]
     search_results: Optional[str]
-    best_candidate: Optional[dict]       # Top pick from evaluate node
+    viable_candidates: List[dict]        # Top picks from evaluate node
     is_better: Optional[bool]            # Result of compare node
     selected_alternative: Optional[dict] # Final chosen alternative
     search_retries: int                  # Tracks search loop count
@@ -113,7 +113,8 @@ async def node_evaluate_alternative(state: AgentState):
     """
     if not os.getenv("GOOGLE_API_KEY"):
         # Mock: pretend we found something reasonable
-        return {"best_candidate": {"title": f"Budget {state['product_data'].product_title}", "price": state['product_data'].price * 0.6, "url": "https://example.com/mock-product"}, "is_better": None}
+        mock_cand = {"title": f"Budget {state['product_data'].product_title}", "price": state['product_data'].price * 0.6, "url": "https://example.com/mock-product"}
+        return {"viable_candidates": [mock_cand], "is_better": None}
 
     prompt = f"""
 Original Product: {state['product_data'].model_dump_json()}
@@ -123,7 +124,8 @@ Raw Search Results:
     msgs = [SystemMessage(content=EVALUATE_PROMPT), HumanMessage(content=prompt)]
     response = await llm.bind(response_format={"type": "json_object"}).ainvoke(msgs)
     eval_data = json.loads(_get_content_str(response.content))
-    return {"best_candidate": eval_data.get("best_candidate"), "is_better": None}  # reset is_better for this pass
+    candidates = eval_data.get("viable_candidates", [])
+    return {"viable_candidates": candidates, "is_better": None}  # reset is_better for this pass
 
 
 async def node_compare(state: AgentState):
@@ -132,31 +134,31 @@ async def node_compare(state: AgentState):
     Decides if the alternative is genuinely worth it.
     """
     if not os.getenv("GOOGLE_API_KEY"):
-        candidate = state.get("best_candidate") or {}
-        return {"is_better": True, "selected_alternative": candidate}
+        candidates = state.get("viable_candidates", [])
+        return {"is_better": True}
 
     prompt = f"""
 UserData: {state['user_data'].model_dump_json()}
 Original Product: {state['product_data'].model_dump_json()}
-Candidate Alternative: {json.dumps(state.get('best_candidate'))}
+Candidate Alternatives: {json.dumps(state.get('viable_candidates'))}
 """
     msgs = [SystemMessage(content=COMPARE_PROMPT), HumanMessage(content=prompt)]
     response = await llm.bind(response_format={"type": "json_object"}).ainvoke(msgs)
     compare_data = json.loads(_get_content_str(response.content))
     return {
         "is_better": compare_data.get("is_better", False),
-        "selected_alternative": compare_data.get("selected_alternative"),
     }
 
 
 async def node_synthesize(state: AgentState):
     """Produces the final AnalysisResult using the validated alternative."""
     if not os.getenv("GOOGLE_API_KEY"):
-        alt = state.get("selected_alternative") or {}
+        cands = state.get("viable_candidates", [])
+        alt_list = [AlternativeProduct(title=c.get("title", "Alt"), price=c.get("price", 0), url=c.get("url")) for c in cands]
         return {"final_decision": AnalysisResult(
             verdict="ALTERNATIVE_RECOMMENDED",
-            reasoning="You can save money buying this alternative.",
-            similar_products_found=[AlternativeProduct(title=alt.get("title", "Alternative"), price=alt.get("price", 0), url=alt.get("url"))]
+            reasoning="You can save money buying these alternatives.",
+            similar_products_found=alt_list
         )}
 
     error_context = ""
@@ -167,7 +169,7 @@ async def node_synthesize(state: AgentState):
 UserData: {state['user_data'].model_dump_json()}
 ProductData: {state['product_data'].model_dump_json()}
 Triage Result: {json.dumps(state.get('triage_result'))}
-Validated Alternative: {json.dumps(state.get('selected_alternative'))}{error_context}
+Validated Alternatives: {json.dumps(state.get('viable_candidates'))}{error_context}
 """
     msgs = [SystemMessage(content=SYNTHESIS_SYSTEM_PROMPT), HumanMessage(content=prompt)]
     response = await llm.bind(response_format={"type": "json_object"}).ainvoke(msgs)
@@ -236,7 +238,7 @@ def route_after_triage(state: AgentState) -> str:
 
 def route_after_evaluate(state: AgentState) -> str:
     """Route based on whether a viable candidate was found."""
-    if state.get("best_candidate"):
+    if state.get("viable_candidates"):
         return "node_compare"
     if state.get("search_retries", 0) < MAX_SEARCH_RETRIES:
         return "node_search"  # Retry with a new search
@@ -303,9 +305,8 @@ async def execute_agent(user: UserData, product: ProductData) -> AnalysisResult:
         "product_data": product,
         "triage_result": None,
         "search_results": None,
-        "best_candidate": None,
+        "viable_candidates": [],
         "is_better": None,
-        "selected_alternative": None,
         "search_retries": 0,
         "final_decision": None,
         "synthesis_retries": 0,
