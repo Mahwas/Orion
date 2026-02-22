@@ -10,6 +10,12 @@ from pynput import mouse, keyboard
 import json
 from google.genai import types
 from datetime import date
+import sys
+import os
+import asyncio
+
+# Add parent directory to path for bridge imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 # Configuration
@@ -24,6 +30,14 @@ screenshots_dir.mkdir(exist_ok=True)
 expenses_file = Path("expenses.json")
 client = genai.Client(api_key=API_KEY)
 listener = None  # Global listener reference
+
+# Import bridge functions for agent integration
+try:
+    from bridge_Orion import get_agent_recommendations, enhance_extracted_data
+    AGENT_AVAILABLE = True
+except ImportError:
+    AGENT_AVAILABLE = False
+    print("⚠ Warning: Agent module not available, running without enhanced recommendations")
 
 
 def capture_cursor_region(x, y):
@@ -189,19 +203,41 @@ def on_click(x, y, button, pressed):
         print(f"Clicked at {x},{y} → capturing region")
         image_path = capture_cursor_region(x, y)
         result = send_to_gemini(image_path)
+        
+        extracted_data = result["extracted_data"]
+        
+        # Get enhanced recommendations from agent if available
+        if AGENT_AVAILABLE:
+            print("\n" + "=" * 60)
+            print("RUNNING AGENT ANALYSIS...")
+            print("=" * 60)
+            try:
+                agent_recommendations = asyncio.run(get_agent_recommendations(extracted_data))
+                extracted_data = enhance_extracted_data(extracted_data, agent_recommendations)
+                print("✓ Agent analysis complete")
+            except Exception as e:
+                print(f"⚠ Agent analysis failed: {e}")
 
         print("\n" + "=" * 60)
         print("EXTRACTED DATA:")
         print("=" * 60)
-        print(json.dumps(result["extracted_data"], indent=2))
+        print(json.dumps({k: v for k, v in extracted_data.items() if k not in ["agent_recommendations"]}, indent=2))
+        
+        if "should_buy" in extracted_data:
+            print("\n" + "=" * 60)
+            print("AGENT RECOMMENDATION:")
+            print("=" * 60)
+            print(f"Should Buy: {extracted_data['should_buy']}")
+            print(f"Reasoning: {extracted_data['agent_reasoning']}")
+        
         print("\n" + "=" * 60)
         print("GEMINI ADVICE & PREDICTIONS:")
         print("=" * 60)
         print(result["gemini_advice"])
         print("=" * 60 + "\n")
         
-        # Save to expense history
-        add_expense_to_history(result["extracted_data"])
+        # Save to expense history with agent recommendations
+        add_expense_to_history(extracted_data)
 
 
 def on_key_press(key):
