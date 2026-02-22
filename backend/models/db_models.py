@@ -46,5 +46,8 @@ class StripeTransaction(Base):
     product_title = Column(String)
     price = Column(Float)
     category = Column(String)
+    url = Column(String, nullable=True)
+    verdict = Column(String, nullable=True)
+    reasoning = Column(String, nullable=True)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     is_recurring = Column(Boolean, default=False)

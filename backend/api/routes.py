@@ -56,15 +56,43 @@ async def analyze_purchase(payload: AnalyzeRequest, db: AsyncSession = Depends(g
         )
 
     result = await execute_agent(payload.user_data, payload.product_data)
+
+    # Store in history
+    analysis_record = StripeTransaction(
+        user_id=user_id,
+        product_title=payload.product_data.product_title,
+        price=payload.product_data.price,
+        category=payload.product_data.category,
+        url=payload.product_data.url,
+        verdict=result.verdict,
+        reasoning=result.reasoning
+    )
+    db.add(analysis_record)
+    await db.commit()
+
     return result
 
 @router.post("/analyze-demo", response_model=AnalysisResult)
-async def analyze_purchase_demo(payload: AnalyzeRequest):
+async def analyze_purchase_demo(payload: AnalyzeRequest, db: AsyncSession = Depends(get_db)):
     """
     Demo endpoint — runs the LangGraph agent with NO entitlement check.
-    For testing only.
+    For testing only. Now saves to history too.
     """
     result = await execute_agent(payload.user_data, payload.product_data)
+
+    # Store in history (demo users included)
+    analysis_record = StripeTransaction(
+        user_id=payload.user_data.user_id,
+        product_title=payload.product_data.product_title,
+        price=payload.product_data.price,
+        category=payload.product_data.category,
+        url=payload.product_data.url,
+        verdict=result.verdict,
+        reasoning=result.reasoning
+    )
+    db.add(analysis_record)
+    await db.commit()
+
     return result
 
 @router.get("/transactions/{user_id}")

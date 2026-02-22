@@ -29,6 +29,8 @@ function navigateTo(pageName) {
     // Trigger page-specific logic on first visit
     if (pageName === 'accounts') {
         fetchAllData();
+    } else if (pageName === 'transactions') {
+        fetchAnalysisHistory();
     }
 }
 
@@ -116,12 +118,21 @@ function renderAnalysis(product, result) {
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px;">
         `;
 
-        result.similar_products_found.forEach(alt => {
+        result.similar_products_found.forEach((alt, idx) => {
+            const amountCents = Math.round(alt.price * 100);
             html += `
                 <div style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 12px; padding: 20px; transition: transform 0.2s;">
                     <h4 style="font-size: 1rem; margin-bottom: 10px;">${alt.title}</h4>
                     <div style="font-size: 1.2rem; font-weight: bold; color: var(--accent-income); margin-bottom: 15px;">$${alt.price.toFixed(2)}</div>
-                    ${alt.url ? `<a href="${alt.url}" target="_blank" class="btn" style="text-decoration: none; display: inline-block; text-align: center; font-size: 0.8rem; padding: 8px 15px;">View Deal</a>` : ''}
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        ${alt.url ? `<a href="${alt.url}" target="_blank" class="btn" style="text-decoration: none; display: inline-block; text-align: center; font-size: 0.8rem; padding: 8px 15px;">View Deal</a>` : ''}
+                        <button
+                            id="issue-card-btn-${idx}"
+                            onclick="handleGenerateCard(${amountCents}, '${alt.title.replace(/'/g, "\\'").substring(0, 50)}')"
+                            style="background: linear-gradient(135deg, #7c3aed, #6366f1); border: none; color: white; font-size: 0.8rem; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                            &#128179; Generate One-Time Card
+                        </button>
+                    </div>
                 </div>
             `;
         });
@@ -131,6 +142,177 @@ function renderAnalysis(product, result) {
 
     html += `</div>`;
     content.innerHTML = html;
+}
+
+// =============================================
+// Stripe Issuing — Virtual Card Modal
+// =============================================
+async function handleGenerateCard(amountCents, merchantHint) {
+    // Show loading modal immediately
+    showCardModal({ loading: true, amountCents, merchantHint });
+
+    try {
+        const response = await fetch(`${API_BASE}/issuing/generate-card`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: 'demo_user',
+                amount_cents: amountCents,
+                merchant_hint: merchantHint
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Issuing failed');
+        }
+
+        const card = await response.json();
+        showCardModal({ loading: false, card, amountCents, merchantHint });
+    } catch (err) {
+        showCardModal({ loading: false, error: err.message });
+    }
+}
+
+function showCardModal({ loading, card, error, amountCents, merchantHint }) {
+    // Remove any existing modal
+    const existing = document.getElementById('card-modal-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'card-modal-overlay';
+    overlay.style.cssText = `
+        position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 9999; backdrop-filter: blur(8px);
+        animation: fadeIn 0.2s ease;
+    `;
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    let inner = '';
+    if (loading) {
+        inner = `
+            <div style="text-align: center; padding: 20px;">
+                <div style="font-size: 2rem; margin-bottom: 15px;">⏳</div>
+                <p style="color: var(--text-secondary);">Generating virtual card via Stripe Issuing...</p>
+            </div>`;
+    } else if (error) {
+        inner = `
+            <div style="text-align: center; padding: 20px;">
+                <div style="font-size: 2rem; margin-bottom: 15px;">❌</div>
+                <p style="color: var(--accent-expense); font-weight: bold;">Card Generation Failed</p>
+                <p style="color: var(--text-secondary); margin-top: 10px; font-size: 0.9rem;">${error}</p>
+                <p style="color: var(--text-secondary); margin-top: 15px; font-size: 0.8rem;">
+                    Tip: Enable Stripe Issuing in your <a href="https://dashboard.stripe.com/test/settings/issuing" target="_blank" style="color: #6366f1;">Stripe Dashboard</a>.
+                </p>
+            </div>`;
+    } else {
+        const expMonth = String(card.exp_month).padStart(2, '0');
+        inner = `
+            <div style="text-align: center;">
+                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 2px; color: #a78bfa; margin-bottom: 20px; font-weight: 700;">🔒 Stripe Issuing — One-Time Virtual Card</div>
+
+                <!-- Card visual -->
+                <div style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%); border-radius: 16px; padding: 28px 28px 20px; margin-bottom: 20px; font-family: monospace; position: relative; overflow: hidden;">
+                    <div style="position: absolute; top: -30px; right: -30px; width: 120px; height: 120px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
+                    <div style="position: absolute; bottom: -40px; left: -20px; width: 160px; height: 160px; background: rgba(255,255,255,0.03); border-radius: 50%;"></div>
+
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 24px;">
+                        <span style="font-size: 0.75rem; color: rgba(255,255,255,0.6); letter-spacing: 1px;">ORION VIRTUAL CARD</span>
+                        <span style="color: #60a5fa; font-weight: bold; font-size: 0.8rem;">VISA</span>
+                    </div>
+
+                    <div id="card-number-display" style="font-size: 1.4rem; letter-spacing: 4px; margin-bottom: 24px; color: #fff; cursor: pointer;" title="Click to copy" onclick="navigator.clipboard.writeText('4242 4242 4242 ${card.last4}').then(() => this.style.color='#4ade80')">
+                        •••• •••• •••• ${card.last4}
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: end;">
+                        <div>
+                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.5); letter-spacing: 1px; margin-bottom: 3px;">CARDHOLDER</div>
+                            <div style="font-size: 0.9rem; color: #fff; text-transform: uppercase; letter-spacing: 1px;">${card.cardholder_name}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.5); letter-spacing: 1px; margin-bottom: 3px;">EXPIRES</div>
+                            <div style="font-size: 0.9rem; color: #fff;">${expMonth}/${String(card.exp_year).slice(-2)}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.5); letter-spacing: 1px; margin-bottom: 3px;">CVC</div>
+                            <div style="font-size: 0.9rem; color: #fff;">${card.cvc}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Spending details -->
+                <div style="background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 12px; padding: 15px; margin-bottom: 20px; text-align: left;">
+                    <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: #a78bfa;">💳 Card Rules</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.8;">
+                        ✅ Spending limit: <strong style="color: #4ade80;">$${card.spending_limit_usd.toFixed(2)}</strong> — cannot be exceeded<br>
+                        ✅ Single-use: blocked after one authorization<br>
+                        ✅ Powered by <strong>Stripe Issuing</strong> (card ID: ${card.card_id.substring(0, 16)}...)
+                    </div>
+                </div>
+
+                <div style="font-size: 0.75rem; color: var(--text-secondary);">This card was created via Stripe Issuing in test mode.</div>
+            </div>`;
+    }
+
+    overlay.innerHTML = `
+        <div style="background: var(--glass-bg, #0f172a); border: 1px solid var(--glass-border, rgba(255,255,255,0.1)); border-radius: 20px; padding: 35px; max-width: 480px; width: 90vw; position: relative;">
+            <button onclick="document.getElementById('card-modal-overlay').remove()" style="position: absolute; top: 15px; right: 15px; background: none; border: none; color: var(--text-secondary); font-size: 1.2rem; cursor: pointer;">✕</button>
+            ${inner}
+        </div>`;
+
+    document.body.appendChild(overlay);
+}
+
+// =============================================
+// Analysis History logic
+// =============================================
+async function fetchAnalysisHistory() {
+    const container = document.getElementById('transactions-content');
+    try {
+        const response = await fetch(`${API_BASE}/transactions/demo_user`);
+        const history = await response.json();
+        renderHistory(history);
+    } catch (error) {
+        console.error("Failed to fetch history:", error);
+        container.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--accent-expense);">Failed to load history.</p>`;
+    }
+}
+
+function renderHistory(history) {
+    const container = document.getElementById('transactions-content');
+    if (!history || history.length === 0) {
+        container.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--text-secondary);">No analyses found yet.</p>`;
+        return;
+    }
+
+    container.innerHTML = history.map(item => {
+        let verdictColor = "var(--text-primary)";
+        if (item.verdict === "BUY") verdictColor = "var(--accent-income)";
+        if (item.verdict === "DO_NOT_BUY") verdictColor = "var(--accent-expense)";
+        if (item.verdict === "ALTERNATIVE_RECOMMENDED") verdictColor = "#f59e0b";
+
+        return `
+            <div class="glass-panel" style="padding: 20px; border-radius: 12px; border: 1px solid var(--glass-border); display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                    <div>
+                        <h3 style="font-size: 1.1rem; margin-bottom: 2px;">${item.product_title}</h3>
+                        <div style="color: var(--accent-income); font-weight: bold;">$${item.price.toFixed(2)}</div>
+                    </div>
+                    <div style="font-size: 0.7rem; font-weight: 700; color: ${verdictColor}; padding: 3px 8px; border: 1.5px solid ${verdictColor}; border-radius: 4px; text-transform: uppercase;">
+                        ${item.verdict.replace(/_/g, ' ')}
+                    </div>
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4; flex-grow: 1; margin: 10px 0;">
+                    ${item.reasoning.substring(0, 150)}${item.reasoning.length > 150 ? '...' : ''}
+                </p>
+                <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
+                    ${new Date(item.timestamp).toLocaleString()}
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 // =============================================
@@ -426,21 +608,18 @@ async function removeBank(e, id) {
 
 function updateValues() {
     const amounts = banks.map(bank => bank.balance);
-    const total = amounts.reduce((acc, item) => (acc += item), 0).toFixed(2);
+    const totalNum = amounts.reduce((acc, item) => acc + item, 0);
+    const incomeNum = amounts.filter(item => item > 0).reduce((acc, item) => acc + item, 0);
+    const expenseNum = Math.abs(amounts.filter(item => item < 0).reduce((acc, item) => acc + item, 0));
 
-    const income = amounts
-        .filter(item => item > 0)
-        .reduce((acc, item) => (acc += item), 0)
-        .toFixed(2);
+    const format = (num) => {
+        if (num > 1e15) return num.toExponential(2);
+        return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
 
-    const expense = (
-        amounts.filter(item => item < 0).reduce((acc, item) => (acc += item), 0) *
-        -1
-    ).toFixed(2);
-
-    balance.innerText = `$${total}`;
-    incomeDisplay.innerText = `+$${income}`;
-    expenseDisplay.innerText = `-$${expense}`;
+    balance.innerText = `$${format(totalNum)}`;
+    incomeDisplay.innerText = `+$${format(incomeNum)}`;
+    expenseDisplay.innerText = `-$${format(expenseNum)}`;
 
     // Animate balance change
     balance.animate([

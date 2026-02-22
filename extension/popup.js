@@ -57,7 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     product_title: productData.product_title,
                     price: productData.price || 0.0,
                     category: "Shopping",
-                    description: `URL: ${tab.url}`
+                    url: tab.url,
+                    description: "Analyzed via Chrome Extension"
                 }
             };
 

@@ -1,1 +1,33 @@
-INFO:     127.0.0.1:55365 - "POST /api/v1/analyze HTTP/1.1" 404 Not Found
+Both GOOGLE_API_KEY and GEMINI_API_KEY are set. Using GOOGLE_API_KEY.
+INFO:     Started server process [53260]
+INFO:     Waiting for application startup.
+2026-02-22 05:15:09,415 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-02-22 05:15:09,415 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("users")
+2026-02-22 05:15:09,415 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 05:15:09,416 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("bank_accounts")
+2026-02-22 05:15:09,416 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 05:15:09,417 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("transactions")
+2026-02-22 05:15:09,417 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 05:15:09,417 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("stripe_users")
+2026-02-22 05:15:09,417 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 05:15:09,417 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("entitlements")
+2026-02-22 05:15:09,417 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 05:15:09,418 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("webhook_events")
+2026-02-22 05:15:09,418 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 05:15:09,418 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("stripe_transactions")
+2026-02-22 05:15:09,418 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 05:15:09,418 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:58918 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58920 - "GET /openapi.json HTTP/1.1" 200 OK
+2026-02-22 05:15:21,484 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-02-22 05:15:21,503 INFO sqlalchemy.engine.Engine SELECT stripe_users.id, stripe_users.email, stripe_users.stripe_customer_id 
+FROM stripe_users 
+WHERE stripe_users.id = ?
+2026-02-22 05:15:21,503 INFO sqlalchemy.engine.Engine [generated in 0.00022s] ('demo_user',)
+2026-02-22 05:15:21,511 INFO sqlalchemy.engine.Engine INSERT INTO stripe_users (id, email, stripe_customer_id) VALUES (?, ?, ?)
+2026-02-22 05:15:21,511 INFO sqlalchemy.engine.Engine [generated in 0.00025s] ('demo_user', 'demo_user@orion.demo', None)
+Cardholder creation failed: Request req_BHDpN131RLDEju: Your account is not set up to use Issuing. Please visit https://dashboard.stripe.com/issuing/overview to get started.
+2026-02-22 05:15:21,933 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:58923 - "POST /api/v1/issuing/generate-card HTTP/1.1" 502 Bad Gateway

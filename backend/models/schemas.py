@@ -55,6 +55,7 @@ class ProductData(BaseModel):
     product_title: str
     price: float
     category: str
+    url: Optional[str] = None
     description: Optional[str] = None
 
 

@@ -119,13 +119,22 @@
         </div>
     </div>
 
-    <!-- ========== PAGE: TRANSACTIONS (placeholder) ========== -->
+    <!-- ========== PAGE: TRANSACTIONS ========== -->
     <div id="page-transactions" class="page-view">
         <div class="container glass-panel" style="max-width: 1200px; width: 90vw;">
-            <header style="grid-column: 1 / -1;">
-                <h1>Transactions</h1>
-                <p style="color: var(--text-secondary); margin-top: 10px;">Coming soon...</p>
+            <header
+                style="grid-column: 1 / -1; border-bottom: 1px solid var(--glass-border); padding-bottom: 20px; margin-bottom: 20px;">
+                <h1>Analysis History</h1>
+                <p style="color: var(--text-secondary); margin-top: 10px;">Review your previous purchase evaluations.
+                </p>
             </header>
+            <div id="transactions-content"
+                style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+                <div class="loading-state"
+                    style="text-align: center; padding: 50px; color: var(--text-secondary); grid-column: 1 / -1;">
+                    Loading history...
+                </div>
+            </div>
         </div>
     </div>
 

@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import routes
 from api.billing import billing_router
 from api.webhooks import webhook_router
+from api.issuing import issuing_router
 from database import engine, Base
 
 # Import ORM models so Base.metadata knows about all tables
@@ -39,6 +40,9 @@ app.include_router(billing_router)
 
 # Stripe webhooks – event ingestion
 app.include_router(webhook_router)
+
+# Stripe Issuing – one-time virtual card generation
+app.include_router(issuing_router)
 
 
 @app.get("/health")
