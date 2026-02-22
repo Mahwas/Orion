@@ -1,0 +1,35 @@
+[
+  {
+    "user_id": "demo_user_001",
+    "name": "Demo User",
+    "monthly_income": 3000,
+    "transactions": [
+      {
+        "date": "2026-02-01",
+        "amount": 45.0,
+        "category": "groceries"
+      },
+      {
+        "date": "2026-02-02",
+        "amount": 20.0,
+        "category": "dining"
+      },
+      {
+        "date": "2026-02-05",
+        "amount": 80.0,
+        "category": "electronics"
+      }
+    ],
+    "savings_goals": {
+      "emergency_fund": 5000,
+      "vacation": 2000
+    },
+    "current_savings": 2500,
+    "days_until_payday": 8,
+    "budget_limits": {
+      "groceries": 300,
+      "dining": 150,
+      "electronics": 200
+    }
+  }
+]

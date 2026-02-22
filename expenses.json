@@ -1,0 +1,137 @@
+[
+  {
+    "date": "2026-02-21",
+    "hour": "00:00:00",
+    "total": 29.97,
+    "category": "appliances",
+    "description": "A 15-piece set of accessories for Ninja Dual Zone Air Fryers, including various racks, silicone liners, oil spray bottle, and other tools, designed for models like AF300EU, AF400EUCP, DZ400EU.",
+    "items": [
+      {
+        "name": "Accessoires Air Fryer Ninja - Ensemble D'accessoires Pour Friteuse \u00e0 Air Double Zone Pour Ninja AF300EU, AF400EUCP, DZ400EU, Friteuse \u00e0 Air Double 7,6L-9,5L | Sans BPA, Passe au Lave-Vaisselle",
+        "price": 29.97
+      }
+    ]
+  },
+  {
+    "date": "2026-02-21",
+    "hour": "00:00:00",
+    "total": 22.92,
+    "category": "appliances",
+    "description": "A set of 19 accessories for dual-zone air fryers, compatible with Ninja Dual Air Fryer models AF300EU/AF400EU/AF400EUCP/DZ400EU, including silicone molds, grill racks, skewers, brushes, silicone gloves, silicone tongs, an oil sprayer, and reusable silicone muffin cups.",
+    "items": [
+      {
+        "name": "Set d'accessoires pour friteuse \u00e0 air (19 pi\u00e8ces)",
+        "price": 22.92
+      }
+    ]
+  },
+  {
+    "date": "2026-02-21",
+    "hour": "00:00:00",
+    "total": 24.99,
+    "category": "appliances",
+    "description": "A set of 19 accessories for dual zone air fryers, compatible with Ninja Dual Air Fryer models AF300EU, AF400EU, AF400EUCP, and DZ400EU with a capacity of 7.6 to 9.5 liters. The accessories include 2 silicone molds for air fryers, 2 grill racks, 4 skewers, 1 silicone brush, 2 silicone gloves, 1 silicone tong, 1 oil sprayer bottle, and 6 reusable silicone muffin molds. The dimensions of the silicone molds are 21.5 x 14.5 x 7 cm.",
+    "items": [
+      {
+        "name": "19 Pcs Accessoires Air Fryer Ninj...",
+        "price": 24.99
+      },
+      {
+        "name": "19 Pcs Accessoires Air Fryer Ninj... D'occasion - Comme Neuf",
+        "price": 22.92
+      }
+    ]
+  },
+  {
+    "date": "2026-02-21",
+    "hour": "00:00:00",
+    "total": 29.97,
+    "category": "appliances",
+    "description": "A set of 15 air fryer accessories for Ninja Dual Zone models, including silicone pots, racks, an oil sprayer, and other utensils.",
+    "items": [
+      {
+        "name": "Accessoires Air Fryer Ninja - Ensemble D'accessoires Pour Friteuse \u00e0 Air Double Zone Pour Ninja AF300EU, AF400EUCP, DZ400EU, Friteuse \u00e0 Air Double 7,6L-9,5L | Sans BPA, Passe au Lave-Vaisselle (15 Pi\u00e8ces)",
+        "price": 29.97
+      }
+    ]
+  },
+  {
+    "date": "2026-02-21",
+    "hour": "00:00:00",
+    "total": 29.97,
+    "category": "appliances",
+    "description": "A set of 15 air fryer accessories, including silicone molds, cooking racks, tongs, and an oil spray bottle, compatible with specific Ninja double zone air fryer models.",
+    "items": [
+      {
+        "name": "Accessoires Air Fryer Ninja - Ensemble de 15 Pi\u00e8ces d'accessoires Pour Friteuse \u00e0 Air Double Zone Pour Ninja AF300EU, AF400EUCP, DZ400EU, Friteuse \u00e0 Air Double 7,6L-9,5L | Sans BPA, Passe au Lave-Vaisselle",
+        "price": 29.97
+      }
+    ]
+  },
+  {
+    "date": "2026-02-22",
+    "hour": "00:00:00",
+    "total": 14824.9,
+    "category": "other",
+    "description": "BBVA checking account summary displaying various financial transactions, including beginning and ending balances, deposits, and electronic withdrawals from Qwest.",
+    "items": [
+      {
+        "name": "Beginning Balance",
+        "price": 15080.5
+      },
+      {
+        "name": "Deposits and Additions (summary total)",
+        "price": 130.0
+      },
+      {
+        "name": "Electronic Withdrawals (summary total)",
+        "price": 356.64
+      },
+      {
+        "name": "ATM Check Deposit",
+        "price": 125.0
+      },
+      {
+        "name": "ATM Cash Deposit",
+        "price": 5.0
+      },
+      {
+        "name": "Qwest 2514552154578 CCD Withdrawal",
+        "price": 246.84
+      },
+      {
+        "name": "Qwest 2514552154578 CCD Withdrawal",
+        "price": 106.2
+      },
+      {
+        "name": "Ending Balance (as of 10/12)",
+        "price": 15154.12
+      },
+      {
+        "name": "Ending Balance (as of 10/20)",
+        "price": 14824.9
+      }
+    ]
+  },
+  {
+    "date": "2026-02-22",
+    "hour": "00:00:00",
+    "total": 10000,
+    "category": "other",
+    "description": "Financial parameters for a budget assistant tool being developed, including monthly income and specific savings goals (emergency fund and vacation).",
+    "items": [
+      {
+        "name": "Monthly income",
+        "price": 3000
+      },
+      {
+        "name": "Emergency fund savings goal",
+        "price": 5000
+      },
+      {
+        "name": "Vacation savings goal",
+        "price": 2000
+      }
+    ]
+  }
+]
