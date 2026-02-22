@@ -252,6 +252,7 @@ async def node_synthesize(state: AgentState):
         return {"final_decision": AnalysisResult(
             verdict="ALTERNATIVE_RECOMMENDED",
             reasoning="You can save money buying these alternatives.",
+            original_product_url=state['product_data'].url,
             similar_products_found=alt_list
         )}
 
@@ -271,21 +272,14 @@ Validated Alternatives: {json.dumps(state.get('viable_candidates'))}{error_conte
 
     try:
         decision = AnalysisResult.model_validate_json(raw)
+        # Always inject the original URL so the frontend can offer a buy button
+        decision.original_product_url = state['product_data'].url
         return {"final_decision": decision, "synthesis_error": None}
     except Exception as e:
         retries = state.get("synthesis_retries", 0) + 1
         print(f"Synthesis parse failed (attempt {retries}/{MAX_SYNTHESIS_RETRIES}): {e}")
         return {"synthesis_retries": retries, "synthesis_error": f"{type(e).__name__}: {e}. Raw: {raw[:300]}", "final_decision": None}
 
-
-# Fast-path nodes use the LLM's own triage reasoning
-async def node_fast_reject(state: AgentState):
-    reasoning = state['triage_result'].get('reasoning', 'Purchase rejected based on your financial profile.')
-    return {"final_decision": AnalysisResult(verdict="DO_NOT_BUY", reasoning=reasoning)}
-
-async def node_fast_approve(state: AgentState):
-    reasoning = state['triage_result'].get('reasoning', 'Purchase approved based on your financial profile.')
-    return {"final_decision": AnalysisResult(verdict="BUY", reasoning=reasoning)}
 
 
 async def node_no_alternative_found(state: AgentState):
@@ -294,7 +288,7 @@ async def node_no_alternative_found(state: AgentState):
     Tells the user we tried twice and couldn't find anything better.
     """
     if not os.getenv("GOOGLE_API_KEY"):
-        return {"final_decision": AnalysisResult(verdict="BUY", reasoning="Mock: no alternatives found.")}
+        return {"final_decision": AnalysisResult(verdict="BUY", reasoning="Mock: no alternatives found.", original_product_url=state['product_data'].url)}
 
     prompt = FINAL_DECISION_NO_ALT_PROMPT.format(
         user_data=state['user_data'].model_dump_json(),
@@ -308,12 +302,14 @@ async def node_no_alternative_found(state: AgentState):
     
     try:
         decision = AnalysisResult.model_validate_json(raw)
+        decision.original_product_url = state['product_data'].url
         return {"final_decision": decision}
     except Exception as e:
         print(f"Final Decision Fallback failed: {e}")
         return {"final_decision": AnalysisResult(
             verdict="DO_NOT_BUY", 
-            reasoning="We could not find a better price, and the final safety check failed to validate a purchase."
+            reasoning="We could not find a better price, and the final safety check failed to validate a purchase.",
+            original_product_url=state['product_data'].url
         )}
 
 
@@ -322,7 +318,8 @@ async def node_synthesis_fallback(state: AgentState):
     triage_reasoning = state.get('triage_result', {}).get('reasoning', 'Analysis could not be completed.')
     decision = AnalysisResult(
         verdict="DO_NOT_BUY",
-        reasoning=f"Recommendation failed after {MAX_SYNTHESIS_RETRIES} attempts. Triage said: {triage_reasoning}"
+        reasoning=f"Recommendation failed after {MAX_SYNTHESIS_RETRIES} attempts. Triage said: {triage_reasoning}",
+        original_product_url=state['product_data'].url
     )
     return {"final_decision": decision}
 
@@ -330,14 +327,6 @@ async def node_synthesis_fallback(state: AgentState):
 # =============================================================================
 # ROUTING
 # =============================================================================
-
-def route_after_triage(state: AgentState) -> str:
-    action = state['triage_result'].get('action', 'SEARCH_ALTERNATIVES')
-    if action == "REJECT":
-        return "fast_reject"
-    elif action == "APPROVE":
-        return "fast_approve"
-    return "node_search"
 
 
 def route_after_evaluate(state: AgentState) -> str:
@@ -378,20 +367,16 @@ workflow.add_node("node_search", node_search)
 workflow.add_node("node_evaluate_alternative", node_evaluate_alternative)
 workflow.add_node("node_compare", node_compare)
 workflow.add_node("node_synthesize", node_synthesize)
-workflow.add_node("fast_reject", node_fast_reject)
-workflow.add_node("fast_approve", node_fast_approve)
 workflow.add_node("node_no_alternative_found", node_no_alternative_found)
 workflow.add_node("synthesis_fallback", node_synthesis_fallback)
 
 workflow.set_entry_point("node_triage")
 
-workflow.add_conditional_edges("node_triage", route_after_triage)
+workflow.add_edge("node_triage", "node_search")
 workflow.add_edge("node_search", "node_evaluate_alternative")
 workflow.add_conditional_edges("node_evaluate_alternative", route_after_evaluate)
 workflow.add_conditional_edges("node_compare", route_after_compare)
 workflow.add_conditional_edges("node_synthesize", route_after_synthesize)
-workflow.add_edge("fast_reject", END)
-workflow.add_edge("fast_approve", END)
 workflow.add_edge("node_no_alternative_found", END)
 workflow.add_edge("synthesis_fallback", END)
 

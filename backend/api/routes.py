@@ -126,6 +126,7 @@ async def get_all_data(db: AsyncSession = Depends(get_db)):
             "id": user.id,
             "name": user.name,
             "email": user.email,
+            "monthly_income": user.monthly_income,
             "accounts": []
         }
         for account in user.accounts:

@@ -70,4 +70,5 @@ class AlternativeProduct(BaseModel):
 class AnalysisResult(BaseModel):
     verdict: str  # "BUY", "ALTERNATIVE_RECOMMENDED", "DO_NOT_BUY"
     reasoning: str
+    original_product_url: Optional[str] = None
     similar_products_found: List[AlternativeProduct] = []

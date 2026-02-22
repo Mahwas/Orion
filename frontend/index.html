@@ -154,13 +154,91 @@
         </div>
     </div>
 
-    <!-- ========== PAGE: SETTINGS (placeholder) ========== -->
+    <!-- ========== PAGE: SETTINGS ========== -->
     <div id="page-settings" class="page-view">
-        <div class="container glass-panel" style="max-width: 1200px; width: 90vw;">
-            <header style="grid-column: 1 / -1;">
-                <h1>Settings</h1>
-                <p style="color: var(--text-secondary); margin-top: 10px;">Coming soon...</p>
+        <div class="container glass-panel" style="max-width: 800px; width: 90vw;">
+            <header
+                style="grid-column: 1 / -1; border-bottom: 1px solid var(--glass-border); padding-bottom: 20px; margin-bottom: 20px;">
+                <h1>Financial Profile</h1>
+                <p style="color: var(--text-secondary); margin-top: 10px;">The agent uses this data to provide
+                    personalized advice.</p>
             </header>
+
+            <form id="profile-form" style="grid-column: 1 / -1; display: grid; gap: 20px;">
+                <div class="form-group">
+                    <label>Monthly Income ($)</label>
+                    <input type="number" id="income" placeholder="8000" step="0.01" required>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label>Pay Cycle</label>
+                        <select id="pay-cycle">
+                            <option value="monthly">Monthly</option>
+                            <option value="bi-weekly">Bi-Weekly</option>
+                            <option value="weekly">Weekly</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Days Until Payday</label>
+                        <input type="number" id="payday-countdown" placeholder="7" required>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px; border-top: 1px solid var(--glass-border); padding-top: 20px;">
+                    <h3>Savings Goals</h3>
+                    <div id="goals-list" style="display: grid; gap: 15px; margin-top: 15px;">
+                        <!-- Goals added here dynamically -->
+                    </div>
+                    <button type="button" class="btn btn-secondary" style="margin-top: 10px; font-size: 0.8rem;"
+                        onclick="addGoalField()">+ Add Goal</button>
+                </div>
+
+                <div style="margin-top: 30px;">
+                    <button type="submit" class="btn" style="width: 100%;">Save Profile</button>
+                </div>
+            </form>
+
+            <div
+                style="grid-column: 1 / -1; margin-top: 50px; border-top: 1px solid var(--glass-border); padding-top: 40px;">
+                <h2 style="margin-bottom: 5px;">Membership & Credits</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 25px;">Support the AI agent and unlock unlimited
+                    analysis.</p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <!-- Credits Pack -->
+                    <div class="glass-panel"
+                        style="padding: 25px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <h3 style="margin-bottom: 10px;">Credits Pack</h3>
+                            <div style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">$5.00</div>
+                            <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5;">Get <strong>10
+                                    analysis credits</strong> to use anytime. Perfect for occasional shopping.</p>
+                        </div>
+                        <button onclick="checkoutCredits()" class="btn btn-secondary"
+                            style="margin-top: 20px; width: 100%;">Buy 10 Credits</button>
+                    </div>
+
+                    <!-- Pro Subscription -->
+                    <div class="glass-panel"
+                        style="padding: 25px; border-radius: 12px; border: 1px solid #6366f1; background: rgba(99, 102, 241, 0.05); display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;">
+                        <div
+                            style="position: absolute; top: 12px; right: -30px; background: #6366f1; color: white; padding: 2px 40px; transform: rotate(45deg); font-size: 0.7rem; font-weight: bold; letter-spacing: 1px;">
+                            BEST VALUE</div>
+                        <div>
+                            <h3 style="margin-bottom: 10px;">Orion Pro</h3>
+                            <div style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">$19.00 <span
+                                    style="font-size: 0.9rem; font-weight: normal; color: var(--text-secondary);">/
+                                    mo</span></div>
+                            <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5;">Unlimited AI
+                                analysis, prioritized search, and <strong>Agentic Wallet</strong> support.</p>
+                        </div>
+                        <button onclick="checkoutPro()" class="btn"
+                            style="margin-top: 20px; width: 100%; background: linear-gradient(135deg, #7c3aed, #6366f1);">Upgrade
+                            to Pro</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

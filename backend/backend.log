@@ -1,0 +1,23 @@
+Both GOOGLE_API_KEY and GEMINI_API_KEY are set. Using GOOGLE_API_KEY.
+INFO:     Started server process [70804]
+INFO:     Waiting for application startup.
+2026-02-22 08:45:01,962 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-02-22 08:45:01,962 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("users")
+2026-02-22 08:45:01,962 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 08:45:01,963 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("bank_accounts")
+2026-02-22 08:45:01,963 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 08:45:01,963 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("transactions")
+2026-02-22 08:45:01,963 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 08:45:01,963 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("stripe_users")
+2026-02-22 08:45:01,964 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 08:45:01,964 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("entitlements")
+2026-02-22 08:45:01,964 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 08:45:01,964 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("webhook_events")
+2026-02-22 08:45:01,964 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 08:45:01,964 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("stripe_transactions")
+2026-02-22 08:45:01,964 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-02-22 08:45:01,965 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     Application startup complete.
+ERROR:    [Errno 48] error while attempting to bind on address ('0.0.0.0', 8000): address already in use
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.

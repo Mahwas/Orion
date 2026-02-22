@@ -31,6 +31,8 @@ function navigateTo(pageName) {
         fetchAllData();
     } else if (pageName === 'transactions') {
         fetchAnalysisHistory();
+    } else if (pageName === 'settings') {
+        fetchUserProfile();
     }
 }
 
@@ -142,6 +144,135 @@ function renderAnalysis(product, result) {
 
     html += `</div>`;
     content.innerHTML = html;
+}
+
+// =============================================
+// Settings / Profile logic
+// =============================================
+async function fetchUserProfile() {
+    try {
+        const response = await fetch(`${API_BASE}/user-profile/1`);
+        const user = await response.json();
+        renderProfile(user);
+    } catch (error) {
+        console.error("Failed to fetch user profile:", error);
+    }
+}
+
+function renderProfile(user) {
+    document.getElementById('income').value = user.monthly_income;
+    document.getElementById('pay-cycle').value = user.pay_cycle;
+    document.getElementById('payday-countdown').value = user.days_until_payday;
+
+    const goalsList = document.getElementById('goals-list');
+    goalsList.innerHTML = '';
+
+    if (user.savings_goals && user.savings_goals.length > 0) {
+        user.savings_goals.forEach(goal => addGoalField(goal.name, goal.current_amount, goal.target_amount));
+    } else {
+        addGoalField();
+    }
+}
+
+function addGoalField(name = '', current = '', target = '') {
+    const goalsList = document.getElementById('goals-list');
+    const div = document.createElement('div');
+    div.className = 'goal-item';
+    div.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; align-items: end;';
+    div.innerHTML = `
+        <div class="form-group">
+            <label style="font-size: 0.7rem;">Goal Name</label>
+            <input type="text" class="goal-name" value="${name}" placeholder="Emergency Fund">
+        </div>
+        <div class="form-group">
+            <label style="font-size: 0.7rem;">Saved ($)</label>
+            <input type="number" class="goal-current" value="${current}" placeholder="1000">
+        </div>
+        <div class="form-group">
+            <label style="font-size: 0.7rem;">Target ($)</label>
+            <input type="number" class="goal-target" value="${target}" placeholder="10000">
+        </div>
+        <button type="button" style="background:none; border:none; color:var(--accent-expense); cursor:pointer; padding: 10px;" onclick="this.parentElement.remove()">✕</button>
+    `;
+    goalsList.appendChild(div);
+}
+
+document.getElementById('profile-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const goals = [];
+    document.querySelectorAll('.goal-item').forEach(item => {
+        const name = item.querySelector('.goal-name').value;
+        const current = parseFloat(item.querySelector('.goal-current').value);
+        const target = parseFloat(item.querySelector('.goal-target').value);
+        if (name) goals.push({ name, current_amount: current || 0, target_amount: target || 0 });
+    });
+
+    const profileData = {
+        monthly_income: parseFloat(document.getElementById('income').value),
+        pay_cycle: document.getElementById('pay-cycle').value,
+        days_until_payday: parseInt(document.getElementById('payday-countdown').value),
+        savings_goals: goals,
+        debts: [] // Future extension
+    };
+
+    try {
+        const response = await fetch(`${API_BASE}/user-profile/1/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(profileData)
+        });
+
+        if (response.ok) {
+            alert('Profile saved successfully!');
+        } else {
+            alert('Failed to save profile.');
+        }
+    } catch (error) {
+        console.error('Error saving profile:', error);
+        alert('Error connecting to backend.');
+    }
+});
+
+// =============================================
+// Stripe Billing logic
+// =============================================
+async function checkoutCredits() {
+    try {
+        const response = await fetch(`${API_BASE.replace('/api/v1', '')}/billing/checkout/credits`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: '1', quantity: 1 })
+        });
+        const data = await response.json();
+        if (data.checkout_url) {
+            window.location.href = data.checkout_url;
+        } else {
+            alert('Failed to start checkout.');
+        }
+    } catch (error) {
+        console.error('Stripe Checkout Error:', error);
+        alert('Error connecting to billing service.');
+    }
+}
+
+async function checkoutPro() {
+    try {
+        const response = await fetch(`${API_BASE.replace('/api/v1', '')}/billing/checkout/pro`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: '1' })
+        });
+        const data = await response.json();
+        if (data.checkout_url) {
+            window.location.href = data.checkout_url;
+        } else {
+            alert('Failed to start checkout.');
+        }
+    } catch (error) {
+        console.error('Stripe Checkout Error:', error);
+        alert('Error connecting to billing service.');
+    }
 }
 
 // =============================================

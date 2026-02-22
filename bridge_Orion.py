@@ -57,7 +57,7 @@ def load_user_from_db():
         print(f"✓ Loaded real user from DB: {db_user['name']} | Balance: ${total_balance:.2f}")
         return UserData(
             user_id=str(db_user["id"]),
-            monthly_income=total_balance,   # best proxy without income field
+            monthly_income=db_user.get("monthly_income", total_balance),
             current_balance=total_balance,
             transactions=all_txs
         )

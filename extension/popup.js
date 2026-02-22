@@ -35,24 +35,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             setStatus(`Found: ${productData.product_title.substring(0, 30)}...\nAnalyzing with Orion...`, 'loading');
 
-            // Hardcode user data for the demo, bridging to /analyze-demo
+            setStatus('Fetching your financial profile...', 'loading');
+            const profileResponse = await fetch('http://localhost:8000/api/v1/user-profile/1');
+            if (!profileResponse.ok) {
+                throw new Error('Could not fetch financial profile.');
+            }
+            const userData = await profileResponse.json();
+
+            setStatus(`Analyzing ${productData.product_title.substring(0, 30)}...`, 'loading');
+
+            // Send product data + the LIVE user data from our DB
             const payload = {
-                user_data: {
-                    user_id: "demo_user",
-                    monthly_income: 8000.0,
-                    current_balance: 12400.0,
-                    pay_cycle: "bi-weekly",
-                    days_until_payday: 14,
-                    savings_goals: [
-                        {
-                            name: "House Down Payment",
-                            current_amount: 45000.0,
-                            target_amount: 100000.0
-                        }
-                    ],
-                    debts: [],
-                    transactions: []
-                },
+                user_data: userData,
                 product_data: {
                     product_title: productData.product_title,
                     price: productData.price || 0.0,
