@@ -3,14 +3,15 @@ Stripe webhook handler — signature verification, idempotency, and fulfillment.
 """
 
 from fastapi import APIRouter, Request, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import stripe
 import os
 import logging
 from datetime import datetime, timezone
 
-from models.db_models import User, Entitlement, WebhookEvent
-from core.database import get_db
+from models.db_models import StripeUser, Entitlement, WebhookEvent
+from database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -22,19 +23,21 @@ WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def _get_or_create_entitlement(user_id: str, db: Session) -> Entitlement:
+async def _get_or_create_entitlement(user_id: str, db: AsyncSession) -> Entitlement:
     """Return the entitlement row for a user, creating it if needed."""
-    ent = db.query(Entitlement).filter(Entitlement.user_id == user_id).first()
+    result = await db.execute(select(Entitlement).where(Entitlement.user_id == user_id))
+    ent = result.scalar_one_or_none()
     if not ent:
         # Also ensure user row exists
-        user = db.query(User).filter(User.id == user_id).first()
+        result = await db.execute(select(StripeUser).where(StripeUser.id == user_id))
+        user = result.scalar_one_or_none()
         if not user:
-            user = User(id=user_id)
+            user = StripeUser(id=user_id)
             db.add(user)
-            db.flush()
+            await db.flush()
         ent = Entitlement(user_id=user_id, credits_balance=0, pro_active=False)
         db.add(ent)
-        db.flush()
+        await db.flush()
     return ent
 
 
@@ -50,7 +53,7 @@ def _find_user_id_from_session(session_obj: dict) -> str | None:
 # ---------------------------------------------------------------------------
 # Event handlers
 # ---------------------------------------------------------------------------
-def _handle_checkout_completed(session_obj: dict, db: Session) -> None:
+async def _handle_checkout_completed(session_obj: dict, db: AsyncSession) -> None:
     """Fulfill a completed Checkout Session (credits or pro)."""
     metadata = session_obj.get("metadata") or {}
     purchase_type = metadata.get("purchase_type")
@@ -60,7 +63,7 @@ def _handle_checkout_completed(session_obj: dict, db: Session) -> None:
         logger.warning("checkout.session.completed without user_id; skipping.")
         return
 
-    ent = _get_or_create_entitlement(user_id, db)
+    ent = await _get_or_create_entitlement(user_id, db)
 
     if purchase_type == "credits":
         credits_per_pack = int(metadata.get("credits_per_pack", 10))
@@ -81,33 +84,33 @@ def _handle_checkout_completed(session_obj: dict, db: Session) -> None:
         logger.warning("Unknown purchase_type '%s' for user %s", purchase_type, user_id)
 
 
-def _handle_invoice_paid(invoice_obj: dict, db: Session) -> None:
+async def _handle_invoice_paid(invoice_obj: dict, db: AsyncSession) -> None:
     """Safety net: re-activate Pro on successful renewal invoice."""
     subscription_id = invoice_obj.get("subscription")
     if not subscription_id:
         return
 
-    ent = (
-        db.query(Entitlement)
-        .filter(Entitlement.pro_subscription_id == subscription_id)
-        .first()
+    result = await db.execute(
+        select(Entitlement)
+        .where(Entitlement.pro_subscription_id == subscription_id)
     )
+    ent = result.scalar_one_or_none()
     if ent and not ent.pro_active:
         ent.pro_active = True
         logger.info("Re-activated Pro for user %s via invoice.paid", ent.user_id)
 
 
-def _handle_subscription_deleted(sub_obj: dict, db: Session) -> None:
+async def _handle_subscription_deleted(sub_obj: dict, db: AsyncSession) -> None:
     """Deactivate Pro when subscription is cancelled / expired."""
     subscription_id = sub_obj.get("id")
     if not subscription_id:
         return
 
-    ent = (
-        db.query(Entitlement)
-        .filter(Entitlement.pro_subscription_id == subscription_id)
-        .first()
+    result = await db.execute(
+        select(Entitlement)
+        .where(Entitlement.pro_subscription_id == subscription_id)
     )
+    ent = result.scalar_one_or_none()
     if ent:
         ent.pro_active = False
         logger.info("Deactivated Pro for user %s (sub deleted: %s)",
@@ -118,7 +121,7 @@ def _handle_subscription_deleted(sub_obj: dict, db: Session) -> None:
 # Main endpoint
 # ---------------------------------------------------------------------------
 @webhook_router.post("/webhook")
-async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     """
     Receive and process Stripe webhook events.
 
@@ -147,7 +150,8 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     event_type: str = event["type"]
 
     # --- Idempotency check ---
-    existing = db.query(WebhookEvent).filter(WebhookEvent.stripe_event_id == event_id).first()
+    result = await db.execute(select(WebhookEvent).where(WebhookEvent.stripe_event_id == event_id))
+    existing = result.scalar_one_or_none()
     if existing:
         logger.info("Duplicate event %s (%s); skipping.", event_id, event_type)
         return {"status": "already_processed"}
@@ -156,11 +160,11 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     data_object = event["data"]["object"]
 
     if event_type == "checkout.session.completed":
-        _handle_checkout_completed(data_object, db)
+        await _handle_checkout_completed(data_object, db)
     elif event_type == "invoice.paid":
-        _handle_invoice_paid(data_object, db)
+        await _handle_invoice_paid(data_object, db)
     elif event_type == "customer.subscription.deleted":
-        _handle_subscription_deleted(data_object, db)
+        await _handle_subscription_deleted(data_object, db)
     else:
         logger.debug("Unhandled event type: %s", event_type)
 
@@ -171,6 +175,6 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         processed_at=datetime.now(timezone.utc),
     )
     db.add(webhook_event)
-    db.commit()
+    await db.commit()
 
     return {"status": "success"}

@@ -4,13 +4,14 @@ Billing endpoints — Stripe Checkout Session creation for credits and Pro.
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import stripe
 import os
 import logging
 
-from models.db_models import User, Entitlement
-from core.database import get_db
+from models.db_models import StripeUser, Entitlement
+from database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ class CheckoutResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def _ensure_stripe_customer(user: User, db: Session) -> str:
+async def _ensure_stripe_customer(user: StripeUser, db: AsyncSession) -> str:
     """Return the Stripe Customer ID, creating one if it doesn't exist."""
     if user.stripe_customer_id:
         return user.stripe_customer_id
@@ -59,27 +60,29 @@ def _ensure_stripe_customer(user: User, db: Session) -> str:
         metadata={"orion_user_id": user.id},
     )
     user.stripe_customer_id = customer.id
-    db.commit()
+    await db.commit()
     return customer.id
 
 
-def _ensure_user(user_id: str, db: Session) -> User:
+async def _ensure_user(user_id: str, db: AsyncSession) -> StripeUser:
     """Fetch or create a User row (minimal auth stub)."""
-    user = db.query(User).filter(User.id == user_id).first()
+    result = await db.execute(select(StripeUser).where(StripeUser.id == user_id))
+    user = result.scalar_one_or_none()
     if not user:
-        user = User(id=user_id)
+        user = StripeUser(id=user_id)
         db.add(user)
-        db.flush()
+        await db.flush()
     return user
 
 
-def _ensure_entitlement(user_id: str, db: Session) -> Entitlement:
+async def _ensure_entitlement(user_id: str, db: AsyncSession) -> Entitlement:
     """Fetch or create an Entitlement row for the user."""
-    ent = db.query(Entitlement).filter(Entitlement.user_id == user_id).first()
+    result = await db.execute(select(Entitlement).where(Entitlement.user_id == user_id))
+    ent = result.scalar_one_or_none()
     if not ent:
         ent = Entitlement(user_id=user_id, credits_balance=0, pro_active=False)
         db.add(ent)
-        db.flush()
+        await db.flush()
     return ent
 
 
@@ -87,7 +90,7 @@ def _ensure_entitlement(user_id: str, db: Session) -> Entitlement:
 # Endpoints
 # ---------------------------------------------------------------------------
 @billing_router.post("/checkout/credits", response_model=CheckoutResponse)
-async def checkout_credits(payload: CreditsCheckoutRequest, db: Session = Depends(get_db)):
+async def checkout_credits(payload: CreditsCheckoutRequest, db: AsyncSession = Depends(get_db)):
     """Create a Stripe Checkout Session for a one-time credits pack purchase."""
 
     if not CREDITS_PRICE_ID:
@@ -97,9 +100,9 @@ async def checkout_credits(payload: CreditsCheckoutRequest, db: Session = Depend
                    "Create a Price in Stripe Dashboard and set the env var.",
         )
 
-    user = _ensure_user(payload.user_id, db)
-    _ensure_entitlement(payload.user_id, db)
-    customer_id = _ensure_stripe_customer(user, db)
+    user = await _ensure_user(payload.user_id, db)
+    await _ensure_entitlement(payload.user_id, db)
+    customer_id = await _ensure_stripe_customer(user, db)
 
     try:
         session = stripe.checkout.Session.create(
@@ -121,7 +124,7 @@ async def checkout_credits(payload: CreditsCheckoutRequest, db: Session = Depend
         logger.error("Stripe error creating credits checkout: %s", e)
         raise HTTPException(status_code=502, detail="Failed to create checkout session.")
 
-    db.commit()
+    await db.commit()
     return CheckoutResponse(
         checkout_session_id=session.id,
         checkout_url=session.url,
@@ -129,7 +132,7 @@ async def checkout_credits(payload: CreditsCheckoutRequest, db: Session = Depend
 
 
 @billing_router.post("/checkout/pro", response_model=CheckoutResponse)
-async def checkout_pro(payload: ProCheckoutRequest, db: Session = Depends(get_db)):
+async def checkout_pro(payload: ProCheckoutRequest, db: AsyncSession = Depends(get_db)):
     """Create a Stripe Checkout Session for Orion Pro subscription."""
 
     if not PRO_PRICE_ID:
@@ -139,9 +142,9 @@ async def checkout_pro(payload: ProCheckoutRequest, db: Session = Depends(get_db
                    "Create a Price in Stripe Dashboard and set the env var.",
         )
 
-    user = _ensure_user(payload.user_id, db)
-    _ensure_entitlement(payload.user_id, db)
-    customer_id = _ensure_stripe_customer(user, db)
+    user = await _ensure_user(payload.user_id, db)
+    await _ensure_entitlement(payload.user_id, db)
+    customer_id = await _ensure_stripe_customer(user, db)
 
     try:
         session = stripe.checkout.Session.create(
@@ -161,7 +164,7 @@ async def checkout_pro(payload: ProCheckoutRequest, db: Session = Depends(get_db
         logger.error("Stripe error creating pro checkout: %s", e)
         raise HTTPException(status_code=502, detail="Failed to create checkout session.")
 
-    db.commit()
+    await db.commit()
     return CheckoutResponse(
         checkout_session_id=session.id,
         checkout_url=session.url,
