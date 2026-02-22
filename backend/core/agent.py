@@ -13,6 +13,7 @@ from core.prompts import (
     EVALUATE_PROMPT,
     COMPARE_PROMPT,
     SYNTHESIS_SYSTEM_PROMPT,
+    FINAL_DECISION_NO_ALT_PROMPT,
 )
 
 MAX_SEARCH_RETRIES = 2
@@ -199,18 +200,28 @@ async def node_no_alternative_found(state: AgentState):
     NEW: Graceful exit after 2 search/evaluate/compare loops with no better product.
     Tells the user we tried twice and couldn't find anything better.
     """
-    triage_reasoning = state.get('triage_result', {}).get('reasoning', '')
-    decision = AnalysisResult(
-        verdict="BUY",
-        reasoning=(
-            f"We searched {state.get('search_retries', MAX_SEARCH_RETRIES)} times but could not find a "
-            f"meaningfully better or cheaper alternative for the {state['product_data'].product_title}. "
-            f"If your budget allows, the original product appears to be the best available option. "
-            f"Financial context: {triage_reasoning}"
-        ),
-        similar_products_found=[]
+    if not os.getenv("GOOGLE_API_KEY"):
+        return {"final_decision": AnalysisResult(verdict="BUY", reasoning="Mock: no alternatives found.")}
+
+    prompt = FINAL_DECISION_NO_ALT_PROMPT.format(
+        user_data=state['user_data'].model_dump_json(),
+        product_data=state['product_data'].model_dump_json(),
+        triage_reasoning=state.get('triage_result', {}).get('reasoning', '')
     )
-    return {"final_decision": decision}
+    
+    msgs = [HumanMessage(content=prompt)]
+    response = await llm.bind(response_format={"type": "json_object"}).ainvoke(msgs)
+    raw = _get_content_str(response.content)
+    
+    try:
+        decision = AnalysisResult.model_validate_json(raw)
+        return {"final_decision": decision}
+    except Exception as e:
+        print(f"Final Decision Fallback failed: {e}")
+        return {"final_decision": AnalysisResult(
+            verdict="DO_NOT_BUY", 
+            reasoning="We could not find a better price, and the final safety check failed to validate a purchase."
+        )}
 
 
 async def node_synthesis_fallback(state: AgentState):

@@ -79,12 +79,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Success! We encode the result and redirect the original tab to the Orion dashboard
             setStatus('Analysis complete! Redirecting...', 'loading');
 
-            const dashboardUrl = new URL('http://127.0.0.1:5500/frontend/index.html'); // Ensure this matches your local dev server
-            dashboardUrl.hash = '#page-analytics';
-            dashboardUrl.searchParams.set('analysis', encodeURIComponent(JSON.stringify({
+            const dashboardUrl = new URL('http://127.0.0.1:5500/frontend/index.html');
+            // searchParams.set automatically URL-encodes the value. No need for encodeURIComponent.
+            dashboardUrl.searchParams.set('analysis', JSON.stringify({
                 product: productData,
                 result: analysisResult
-            })));
+            }));
+            dashboardUrl.hash = '#page-analytics';
 
             // Update the tab to the dashboard URL
             chrome.tabs.update(tab.id, { url: dashboardUrl.toString() });

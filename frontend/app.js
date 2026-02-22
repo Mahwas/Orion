@@ -45,16 +45,26 @@ navLinks.forEach(link => {
 // Analytics (Extension Bridge)
 // =============================================
 function handleUrlParams() {
-    const params = new URLSearchParams(window.location.search);
-    const analysisDataParam = params.get('analysis');
+    // Check search params (standard)
+    let params = new URLSearchParams(window.location.search);
+    let analysisDataParam = params.get('analysis');
+
+    // Fallback: check hash params (if some tool/browser puts them there)
+    if (!analysisDataParam && window.location.hash.includes('?')) {
+        const hashSearch = window.location.hash.split('?')[1];
+        params = new URLSearchParams(hashSearch);
+        analysisDataParam = params.get('analysis');
+    }
 
     if (analysisDataParam) {
         try {
-            const data = JSON.parse(decodeURIComponent(analysisDataParam));
+            // URLSearchParams.get already decodes once. JSON should be clean now.
+            const data = JSON.parse(analysisDataParam);
             console.log("Received Analysis Data:", data);
 
-            // Clean up the URL
-            window.history.replaceState({}, document.title, window.location.pathname);
+            // Clean up the URL (remove params but keep hash for routing if needed)
+            const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + window.location.hash;
+            window.history.replaceState({}, document.title, cleanUrl);
 
             // Switch to Analytics tab
             navigateTo('analytics');
