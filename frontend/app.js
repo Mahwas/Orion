@@ -42,6 +42,88 @@ navLinks.forEach(link => {
 });
 
 // =============================================
+// Analytics (Extension Bridge)
+// =============================================
+function handleUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+    const analysisDataParam = params.get('analysis');
+
+    if (analysisDataParam) {
+        try {
+            const data = JSON.parse(decodeURIComponent(analysisDataParam));
+            console.log("Received Analysis Data:", data);
+
+            // Clean up the URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+
+            // Switch to Analytics tab
+            navigateTo('analytics');
+
+            // Render
+            renderAnalysis(data.product, data.result);
+        } catch (e) {
+            console.error("Failed to parse analysis data from URL", e);
+        }
+    }
+}
+
+function renderAnalysis(product, result) {
+    const content = document.getElementById('analytics-content');
+    const status = document.getElementById('analytics-status');
+
+    status.innerText = "Analysis Complete";
+    status.style.color = "var(--accent-primary)";
+
+    let verdictColor = "var(--text-primary)";
+    if (result.verdict === "BUY") verdictColor = "var(--accent-income)";
+    if (result.verdict === "DO_NOT_BUY") verdictColor = "var(--accent-expense)";
+    if (result.verdict === "ALTERNATIVE_RECOMMENDED") verdictColor = "#f59e0b"; // amber
+
+    let html = `
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 16px; padding: 30px; margin-bottom: 30px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+                <div>
+                    <h2 style="font-size: 1.8rem; margin-bottom: 5px;">${product.product_title || 'Unknown Product'}</h2>
+                    <p style="font-size: 1.2rem; color: var(--text-secondary);">$${parseFloat(product.price || 0).toFixed(2)}</p>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 5px;">Verdict</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: ${verdictColor}; padding: 5px 15px; border: 2px solid ${verdictColor}; border-radius: 8px;">
+                        ${result.verdict.replace(/_/g, ' ')}
+                    </div>
+                </div>
+            </div>
+            
+            <div style="padding: 20px; background: rgba(0,0,0,0.3); border-radius: 12px; margin-bottom: 30px;">
+                <h3 style="font-size: 1rem; margin-bottom: 10px; color: var(--text-secondary);">Agent Reasoning</h3>
+                <p style="line-height: 1.6;">${result.reasoning}</p>
+            </div>
+    `;
+
+    if (result.similar_products_found && result.similar_products_found.length > 0) {
+        html += `
+            <h3 style="font-size: 1.2rem; margin-bottom: 15px;">Alternative Recommendations</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px;">
+        `;
+
+        result.similar_products_found.forEach(alt => {
+            html += `
+                <div style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 12px; padding: 20px; transition: transform 0.2s;">
+                    <h4 style="font-size: 1rem; margin-bottom: 10px;">${alt.title}</h4>
+                    <div style="font-size: 1.2rem; font-weight: bold; color: var(--accent-income); margin-bottom: 15px;">$${alt.price.toFixed(2)}</div>
+                    ${alt.url ? `<a href="${alt.url}" target="_blank" class="btn" style="text-decoration: none; display: inline-block; text-align: center; font-size: 0.8rem; padding: 8px 15px;">View Deal</a>` : ''}
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+    }
+
+    html += `</div>`;
+    content.innerHTML = html;
+}
+
+// =============================================
 // Dashboard logic
 // =============================================
 const balance = document.getElementById('balance');
@@ -457,4 +539,5 @@ function renderData(users) {
 // =============================================
 // Boot
 // =============================================
+handleUrlParams();
 init();

@@ -5,14 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 
-# Imports from HEAD (database branch)
-from models import PurchaseContext, DecisionOutput, FeedbackEvent, FinancialSnapshot, BudgetMemoryPreferences, BudgetMemoryLearningWeights, BudgetMemory
-from core.agent import evaluate_purchase
-from services.stripe_service import create_checkout
 from database import get_db
 from models.orm import User, BankAccount, Transaction
-
-# Imports from feature branch
 from models.schemas import UserData, ProductData, AnalysisResult
 from models.db_models import StripeTransaction, StripeUser, Entitlement
 from core.agent import execute_agent
@@ -27,9 +21,6 @@ class BankAccountCreate(BaseModel):
 class AnalyzeRequest(BaseModel):
     user_data: UserData
     product_data: ProductData
-
-# Global state to act as a buffer for the demo
-latest_decision = None
 
 @router.post("/analyze", response_model=AnalysisResult)
 async def analyze_purchase(payload: AnalyzeRequest, db: AsyncSession = Depends(get_db)):
@@ -67,6 +58,15 @@ async def analyze_purchase(payload: AnalyzeRequest, db: AsyncSession = Depends(g
     result = await execute_agent(payload.user_data, payload.product_data)
     return result
 
+@router.post("/analyze-demo", response_model=AnalysisResult)
+async def analyze_purchase_demo(payload: AnalyzeRequest):
+    """
+    Demo endpoint — runs the LangGraph agent with NO entitlement check.
+    For testing only.
+    """
+    result = await execute_agent(payload.user_data, payload.product_data)
+    return result
+
 @router.get("/transactions/{user_id}")
 async def get_user_transactions(user_id: str, db: AsyncSession = Depends(get_db)):
     """
@@ -80,78 +80,7 @@ async def get_user_transactions(user_id: str, db: AsyncSession = Depends(get_db)
     transactions = result.scalars().all()
     return transactions
 
-@router.post("/context", response_model=Dict[str, Any])
-async def ingest_context(context: PurchaseContext):
-    global latest_decision
-    
-    # Mocking user data for demo since there's no DB
-    snapshot = FinancialSnapshot(
-        user_id="u123",
-        current_balance=1500.50,
-        upcoming_bills_total=850.00,
-        discretionary_budget_remaining=150.00,
-        days_until_payday=5
-    )
-    
-    memory = BudgetMemory(
-        user_id="u123",
-        preferences=BudgetMemoryPreferences(
-            strictness=0.8,
-            savings_goal=500.0,
-            deal_breaker_categories=["luxury_clothing"]
-        ),
-        learning_weights=BudgetMemoryLearningWeights(
-            importance_of_alternatives=1.2
-        )
-    )
-    
-    latest_decision = await evaluate_purchase(context, snapshot, memory)
-    
-    return {"status": "success", "message": "Context ingested and assigned to agent"}
 
-@router.get("/advice", response_model=DecisionOutput)
-async def get_latest_advice():
-    global latest_decision
-    if not latest_decision:
-        return DecisionOutput(
-            verdict="PENDING",
-            score=0,
-            reasons=[],
-            conditions_to_yes=[],
-            alternatives=[],
-            followup_question=""
-        )
-    return latest_decision
-
-@router.post("/checkout")
-async def create_checkout_session(item_name: str, price: float):
-    url = create_checkout(item_name, price)
-    return {"url": url}
-
-@router.post("/webhooks/stripe")
-async def stripe_webhook():
-    return {"status": "received"}
-
-@router.get("/user/config")
-async def get_user_config():
-    return {
-        "snapshot": {
-            "user_id": "u123",
-            "current_balance": 1500.50,
-            "upcoming_bills_total": 850.00,
-            "discretionary_budget_remaining": 150.00,
-            "days_until_payday": 5
-        },
-        "memory": {
-            "strictness": 0.8,
-            "savings_goal": 500.0,
-            "deal_breaker_categories": ["luxury_clothing"]
-        }
-    }
-
-@router.post("/user/feedback")
-async def receive_feedback(event: FeedbackEvent):
-    return {"status": "recorded"}
 
 @router.get("/all-data")
 async def get_all_data(db: AsyncSession = Depends(get_db)):

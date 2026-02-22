@@ -143,7 +143,7 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         event = stripe.Webhook.construct_event(payload, sig_header, WEBHOOK_SECRET)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid payload.")
-    except stripe.error.SignatureVerificationError:
+    except stripe.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature.")
 
     event_id: str = event["id"]

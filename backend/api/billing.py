@@ -120,7 +120,7 @@ async def checkout_credits(payload: CreditsCheckoutRequest, db: AsyncSession = D
                 "packs": str(payload.quantity),
             },
         )
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error("Stripe error creating credits checkout: %s", e)
         raise HTTPException(status_code=502, detail="Failed to create checkout session.")
 
@@ -160,7 +160,7 @@ async def checkout_pro(payload: ProCheckoutRequest, db: AsyncSession = Depends(g
                 "purchase_type": "pro",
             },
         )
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error("Stripe error creating pro checkout: %s", e)
         raise HTTPException(status_code=502, detail="Failed to create checkout session.")
 

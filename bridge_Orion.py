@@ -25,12 +25,58 @@ def build_product_data(extracted):
         description=extracted.get("description", "")
     ) 
 
+def load_user_from_db():
+    """Fetch the first user from the live backend and map to UserData. Returns None if backend is offline."""
+    import urllib.request
+    import urllib.error
+    try:
+        with urllib.request.urlopen("http://localhost:8000/api/v1/all-data", timeout=2) as resp:
+            data = json.loads(resp.read().decode())
+        users = data.get("users", [])
+        if not users:
+            return None
+        db_user = users[0]
+
+        # Map bank accounts → current_balance (sum of all accounts)
+        accounts = db_user.get("accounts", [])
+        total_balance = sum(a["balance"] for a in accounts)
+
+        # Map transactions from all accounts into UserData schema
+        all_txs = []
+        for acc in accounts:
+            for i, tx in enumerate(acc.get("transactions", [])):
+                all_txs.append({
+                    "id": str(tx.get("id", i)),
+                    "date": tx.get("timestamp", "")[:10],
+                    "merchant": tx.get("merchant", "Unknown"),
+                    "amount": tx.get("amount", 0.0),
+                    "category": tx.get("category", "Other"),
+                    "is_recurring": False
+                })
+
+        print(f"✓ Loaded real user from DB: {db_user['name']} | Balance: ${total_balance:.2f}")
+        return UserData(
+            user_id=str(db_user["id"]),
+            monthly_income=total_balance,   # best proxy without income field
+            current_balance=total_balance,
+            transactions=all_txs
+        )
+    except Exception as e:
+        print(f"⚠ Could not reach backend ({e}), falling back to mock JSON")
+        return None
+
+
 def load_user():
+    """Load user data — tries live DB first, falls back to mock JSON."""
+    db_user = load_user_from_db()
+    if db_user:
+        return db_user
     user_file = Path(__file__).parent / "backend" / "data" / "users" / "mock_users.json"
     if not user_file.exists():
         create_mock_user_data(user_file)
     with open(user_file) as f:
         users = json.load(f)
+    print("✓ Loaded user from mock JSON")
     return UserData(**users[0])
 
 
