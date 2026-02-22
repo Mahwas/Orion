@@ -629,3 +629,30 @@ input[type="number"] {
         margin-bottom: 15px;
     }
 }
+
+/* =============================================
+   SPA Page Views
+   ============================================= */
+.page-view {
+    display: none;
+    width: 100%;
+    animation: pageFadeIn 0.35s ease-out;
+}
+
+.page-view.active-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+@keyframes pageFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

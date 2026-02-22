@@ -1,4 +1,49 @@
 console.log("Orion App loaded at " + new Date().toLocaleTimeString());
+
+// =============================================
+// SPA Router — handles tab switching
+// =============================================
+const navLinks = document.querySelectorAll('.nav-links a[data-page]');
+const pageViews = document.querySelectorAll('.page-view');
+
+function navigateTo(pageName) {
+    // Hide all pages
+    pageViews.forEach(view => {
+        view.classList.remove('active-page');
+    });
+
+    // Show target page
+    const target = document.getElementById(`page-${pageName}`);
+    if (target) {
+        target.classList.add('active-page');
+    }
+
+    // Update active nav link
+    navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.dataset.page === pageName) {
+            link.classList.add('active');
+        }
+    });
+
+    // Trigger page-specific logic on first visit
+    if (pageName === 'accounts') {
+        fetchAllData();
+    }
+}
+
+// Attach click handlers to nav links
+navLinks.forEach(link => {
+    link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const page = link.dataset.page;
+        navigateTo(page);
+    });
+});
+
+// =============================================
+// Dashboard logic
+// =============================================
 const balance = document.getElementById('balance');
 const incomeDisplay = document.getElementById('income');
 const expenseDisplay = document.getElementById('expense');
@@ -321,4 +366,95 @@ function updateLocalStorage() {
 
 bankForm.addEventListener('submit', addBank);
 
+// =============================================
+// Accounts (Data) page logic
+// =============================================
+const dataContent = document.getElementById('data-content');
+
+async function fetchAllData() {
+    try {
+        const response = await fetch(`${API_BASE}/all-data`);
+        if (!response.ok) throw new Error('Backend not reachable');
+        const data = await response.json();
+        renderData(data.users);
+    } catch (error) {
+        dataContent.innerHTML = `
+            <div style="text-align: center; padding: 50px; background: rgba(239, 68, 68, 0.1); border-radius: 16px; border: 1px solid var(--accent-expense);">
+                <h2 style="color: var(--accent-expense); margin-bottom: 10px;">Connection Error</h2>
+                <p style="color: var(--text-secondary);">Unable to connect to the Orion Backend. Please ensure the server is running on port 8000.</p>
+                <button onclick="fetchAllData()" class="btn" style="max-width: 200px; margin-top: 20px;">Retry Connection</button>
+            </div>
+        `;
+    }
+}
+
+function renderData(users) {
+    if (!users || users.length === 0) {
+        dataContent.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No data found in database.</p>';
+        return;
+    }
+
+    let html = '';
+    users.forEach(user => {
+        html += `
+            <div class="user-section" style="margin-bottom: 40px;">
+                <div class="glass-panel" style="padding: 20px; border-radius: 16px; margin-bottom: 20px; background: rgba(255,255,255,0.05);">
+                    <h2 style="font-size: 1.5rem; color: #fff;">${user.name}</h2>
+                    <p style="color: var(--text-secondary);">${user.email}</p>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
+        `;
+
+        user.accounts.forEach(acc => {
+            html += `
+                <div class="account-card glass-panel" style="padding: 0; overflow: hidden; border-radius: 16px;">
+                    <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 25px; border-bottom: 1px solid var(--glass-border);">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px;">${acc.type} Account</div>
+                                <div style="font-size: 2rem; font-weight: 700; color: #fff; margin-top: 5px;">$${acc.balance.toFixed(2)}</div>
+                            </div>
+                            <div style="background: rgba(99, 102, 241, 0.2); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; color: var(--accent-primary); font-weight: 600; border: 1px solid var(--accent-primary);">${acc.currency}</div>
+                        </div>
+                    </div>
+                    <div style="padding: 20px;">
+                        <h4 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 15px; text-transform: uppercase;">Recent Activity</h4>
+                        <ul style="list-style: none;">
+            `;
+
+            acc.transactions.forEach(tx => {
+                const isCredit = tx.type === 'CREDIT';
+                html += `
+                    <li style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 12px; margin-bottom: 8px; border-left: 3px solid ${isCredit ? 'var(--accent-income)' : 'var(--accent-expense)'}">
+                        <div>
+                            <div style="font-weight: 500; font-size: 0.95rem;">${tx.merchant}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary);">${new Date(tx.timestamp).toLocaleDateString()} • ${tx.category}</div>
+                        </div>
+                        <div style="font-weight: 700; color: ${isCredit ? 'var(--accent-income)' : 'var(--accent-expense)'}">
+                            ${isCredit ? '+' : '-'}$${tx.amount.toFixed(2)}
+                        </div>
+                    </li>
+                `;
+            });
+
+            html += `
+                        </ul>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `
+                </div>
+            </div>
+        `;
+    });
+
+    dataContent.innerHTML = html;
+}
+
+// =============================================
+// Boot
+// =============================================
 init();

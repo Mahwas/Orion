@@ -34,11 +34,11 @@
                 <span class="brand-text">Orion</span>
             </div>
             <ul class="nav-links">
-                <li><a href="index.html" class="active">Dashboard</a></li>
-                <li><a href="data.html">Accounts</a></li>
-                <li><a href="#">Transactions</a></li>
-                <li><a href="#">Analytics</a></li>
-                <li><a href="#">Settings</a></li>
+                <li><a href="#" data-page="dashboard" class="active">Dashboard</a></li>
+                <li><a href="#" data-page="accounts">Accounts</a></li>
+                <li><a href="#" data-page="transactions">Transactions</a></li>
+                <li><a href="#" data-page="analytics">Analytics</a></li>
+                <li><a href="#" data-page="settings">Settings</a></li>
             </ul>
             <div class="nav-profile">
                 <img src="https://ui-avatars.com/api/?name=Joshi&background=6366f1&color=fff" alt="Profile"
@@ -47,55 +47,106 @@
         </div>
     </nav>
 
-    <div class="container glass-panel">
-        <header>
-            <h1>Dashboard</h1>
-            <div class="balance-container">
-                <div class="total-balance">
-                    <h2>Total Balance</h2>
-                    <h3 id="balance">$0.00</h3>
+    <!-- ========== PAGE: DASHBOARD ========== -->
+    <div id="page-dashboard" class="page-view active-page">
+        <div class="container glass-panel">
+            <header>
+                <h1>Dashboard</h1>
+                <div class="balance-container">
+                    <div class="total-balance">
+                        <h2>Total Balance</h2>
+                        <h3 id="balance">$0.00</h3>
+                    </div>
+                    <div class="income-expense-cards">
+                        <div class="card income-card">
+                            <span class="label">Incoming</span>
+                            <span class="label">(this month)</span>
+                            <span id="income" class="amount">+$0.00</span>
+                        </div>
+                        <div class="card expense-card">
+                            <span class="label">Outgoing</span>
+                            <span class="label">(this month)</span>
+                            <span id="expense" class="amount">-$0.00</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="income-expense-cards">
-                    <div class="card income-card">
-                        <span class="label">Incoming</span>
-                        <span class="label">(this month)</span>
-                        <span id="income" class="amount">+$0.00</span>
+            </header>
+
+            <section class="bank-accounts">
+                <h3>Bank Accounts</h3>
+                <ul id="bank-list" class="bank-list">
+                    <!-- Banks will be injected here via JS -->
+                </ul>
+                <h3 style="margin-top: 20px; border-top: 1px solid var(--glass-border); padding-top: 20px;">Add New Bank
+                    Account</h3>
+                <form id="bank-form" onsubmit="event.preventDefault();">
+                    <div class="form-group">
+                        <label for="bank-name">Bank Name</label>
+                        <input type="text" id="bank-name" placeholder="e.g. Chase Checkings..." required
+                            autocomplete="off">
                     </div>
-                    <div class="card expense-card">
-                        <span class="label">Outgoing</span>
-                        <span class="label">(this month)</span>
-                        <span id="expense" class="amount">-$0.00</span>
+                    <div class="form-group">
+                        <label for="bank-balance">Initial Balance</label>
+                        <input type="number" id="bank-balance" placeholder="Enter balance..." required step="0.01">
                     </div>
+                    <button type="submit" class="btn">Add Bank Account</button>
+                </form>
+            </section>
+
+            <section class="history">
+                <h3 id="history-title">History</h3>
+                <ul id="list" class="transaction-list">
+                    <!-- Transactions will be injected here via JS -->
+                </ul>
+            </section>
+        </div>
+    </div>
+
+    <!-- ========== PAGE: ACCOUNTS (DATA) ========== -->
+    <div id="page-accounts" class="page-view">
+        <div class="container glass-panel" style="max-width: 1200px; width: 90vw;">
+            <header
+                style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 30px; margin-bottom: 30px;">
+                <h1 style="margin-bottom: 0;">Accounts</h1>
+                <p id="system-status" style="color: var(--accent-income); font-weight: 600;">System Online</p>
+            </header>
+
+            <div id="data-content" style="grid-column: 1 / -1;">
+                <div class="loading-state" style="text-align: center; padding: 50px; color: var(--text-secondary);">
+                    Connecting to Orion Database...
                 </div>
             </div>
-        </header>
+        </div>
+    </div>
 
-        <section class="bank-accounts">
-            <h3>Bank Accounts</h3>
-            <ul id="bank-list" class="bank-list">
-                <!-- Banks will be injected here via JS -->
-            </ul>
-            <h3 style="margin-top: 20px; border-top: 1px solid var(--glass-border); padding-top: 20px;">Add New Bank
-                Account</h3>
-            <form id="bank-form" onsubmit="event.preventDefault();">
-                <div class="form-group">
-                    <label for="bank-name">Bank Name</label>
-                    <input type="text" id="bank-name" placeholder="e.g. Chase Checkings..." required autocomplete="off">
-                </div>
-                <div class="form-group">
-                    <label for="bank-balance">Initial Balance</label>
-                    <input type="number" id="bank-balance" placeholder="Enter balance..." required step="0.01">
-                </div>
-                <button type="submit" class="btn">Add Bank Account</button>
-            </form>
-        </section>
+    <!-- ========== PAGE: TRANSACTIONS (placeholder) ========== -->
+    <div id="page-transactions" class="page-view">
+        <div class="container glass-panel" style="max-width: 1200px; width: 90vw;">
+            <header style="grid-column: 1 / -1;">
+                <h1>Transactions</h1>
+                <p style="color: var(--text-secondary); margin-top: 10px;">Coming soon...</p>
+            </header>
+        </div>
+    </div>
 
-        <section class="history">
-            <h3 id="history-title">History</h3>
-            <ul id="list" class="transaction-list">
-                <!-- Transactions will be injected here via JS -->
-            </ul>
-        </section>
+    <!-- ========== PAGE: ANALYTICS (placeholder) ========== -->
+    <div id="page-analytics" class="page-view">
+        <div class="container glass-panel" style="max-width: 1200px; width: 90vw;">
+            <header style="grid-column: 1 / -1;">
+                <h1>Analytics</h1>
+                <p style="color: var(--text-secondary); margin-top: 10px;">Coming soon...</p>
+            </header>
+        </div>
+    </div>
+
+    <!-- ========== PAGE: SETTINGS (placeholder) ========== -->
+    <div id="page-settings" class="page-view">
+        <div class="container glass-panel" style="max-width: 1200px; width: 90vw;">
+            <header style="grid-column: 1 / -1;">
+                <h1>Settings</h1>
+                <p style="color: var(--text-secondary); margin-top: 10px;">Coming soon...</p>
+            </header>
+        </div>
     </div>
 
     <script src="app.js"></script>
