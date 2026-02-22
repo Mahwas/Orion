@@ -351,10 +351,21 @@ main {
     border: 1px solid var(--border-color);
 }
 
-.btn-proceed:hover {
+.secondary-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.btn-wait, .btn-wishlist {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-wait:hover, .btn-wishlist:hover {
     background: rgba(255, 255, 255, 0.05);
     color: var(--text-primary);
-    border-color: rgba(255, 255, 255, 0.2);
 }
 
 .success-icon {

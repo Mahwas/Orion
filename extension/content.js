@@ -1,6 +1,7 @@
 (function() {
     'use strict';
 
+    // --- Configuration & Constants ---
     const CONFIG = {
         DETECTION_DELAYS: [1000],
         DEBOUNCE_DELAY: 500,
@@ -20,33 +21,7 @@
         PROCEED_CHECKOUT: 'PROCEED_CHECKOUT'
     };
 
-    const CHECKOUT_KEYWORDS = [
-        'checkout', 'buy now', 'purchase', 'pay now', 'place order',
-        'complete order', 'submit order', 'finish checkout', 'finalize',
-        'secure checkout', 'make payment', 'confirm order', 'process order',
-        'continue to payment', 'proceed to payment', 'proceed to checkout',
-        'continue to checkout', 'review order', 'review and pay',
-        'continue to shipping', 'continue to billing', 'express checkout',
-        'quick checkout', 'guest checkout', 'one-click checkout',
-        'buy with prime', 'pay with paypal', 'pay with apple pay',
-        'pay with google pay', 'pay with card', 'pay with credit card'
-    ];
-
-    const FORM_KEYWORDS = ['checkout', 'order', 'payment'];
-
-    const IFRAME_CHECKOUT_KEYWORDS = ['checkout', 'payment', 'order', 'purchase', 'basket', 'cart'];
-
-    let PLATFORM_URL_PATTERNS = [];
-    let CHECKOUT_QUERY_PARAMS = [];
-    let NEGATIVE_URL_PATTERNS = [];
-    let PLATFORM_BUTTON_SELECTORS = [];
-    let ONE_CLICK_BUTTONS = [];
-    let CART_INDICATORS = [];
-    let PRICE_INDICATORS = [];
-    let CHECKOUT_FIELD_SELECTORS = [];
-    let PRICE_SELECTORS = [];
-    let CURRENCY_SYMBOLS = [];
-
+    // Default selectors (fallback if config load fails)
     const DEFAULT_CONFIG = {
         platformUrlPatterns: [
             /\/checkout/i, /\/cart/i, /\/basket/i, /\/payment/i, /\/order/i,
@@ -66,6 +41,28 @@
         currencySymbols: ['$', '€', '£', '¥']
     };
 
+    // State
+    let state = {
+        platformUrlPatterns: [],
+        checkoutQueryParams: [],
+        negativeUrlPatterns: [],
+        platformButtonSelectors: [],
+        oneClickButtons: [],
+        cartIndicators: [],
+        priceIndicators: [],
+        checkoutFieldSelectors: [],
+        priceSelectors: [],
+        currencySymbols: [],
+        hasShownInterception: false,
+        interceptLock: Promise.resolve(),
+        observer: null,
+        historyDebounceTimeout: null,
+        formInterceptDebounce: null,
+        observerThrottleTimeout: null
+    };
+
+    // --- Core Logic ---
+
     async function loadConfig() {
         try {
             if (typeof chrome === 'undefined' || !chrome.runtime) {
@@ -74,19 +71,22 @@
                 return;
             }
             
-            const response = await fetch(chrome.runtime.getURL('config/selectors.json'));
+            const url = chrome.runtime.getURL('config/selectors.json');
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Config fetch failed');
+            
             const config = await response.json();
             
-            PLATFORM_URL_PATTERNS = config.platformUrlPatterns.map(p => new RegExp(p.replace(/\\\//g, '/'), 'i'));
-            CHECKOUT_QUERY_PARAMS = config.checkoutQueryParams || [];
-            NEGATIVE_URL_PATTERNS = config.negativeUrlPatterns.map(p => new RegExp(p.replace(/\\\//g, '/'), 'i'));
-            PLATFORM_BUTTON_SELECTORS = config.platformButtonSelectors || [];
-            ONE_CLICK_BUTTONS = config.oneClickButtons || [];
-            CART_INDICATORS = config.cartIndicators || [];
-            PRICE_INDICATORS = config.priceIndicators || [];
-            CHECKOUT_FIELD_SELECTORS = config.checkoutFieldSelectors || [];
-            PRICE_SELECTORS = config.priceSelectors || [];
-            CURRENCY_SYMBOLS = config.currencySymbols || ['$', '€', '£', '¥'];
+            state.platformUrlPatterns = (config.platformUrlPatterns || []).map(p => new RegExp(p.replace(/\\\//g, '/'), 'i'));
+            state.checkoutQueryParams = config.checkoutQueryParams || [];
+            state.negativeUrlPatterns = (config.negativeUrlPatterns || []).map(p => new RegExp(p.replace(/\\\//g, '/'), 'i'));
+            state.platformButtonSelectors = config.platformButtonSelectors || [];
+            state.oneClickButtons = config.oneClickButtons || [];
+            state.cartIndicators = config.cartIndicators || [];
+            state.priceIndicators = config.priceIndicators || [];
+            state.checkoutFieldSelectors = config.checkoutFieldSelectors || [];
+            state.priceSelectors = config.priceSelectors || [];
+            state.currencySymbols = config.currencySymbols || DEFAULT_CONFIG.currencySymbols;
             
             console.log('[Orion] Config loaded successfully');
         } catch (e) {
@@ -96,12 +96,14 @@
     }
 
     function applyDefaults() {
-        PLATFORM_URL_PATTERNS = DEFAULT_CONFIG.platformUrlPatterns;
-        PLATFORM_BUTTON_SELECTORS = DEFAULT_CONFIG.platformButtonSelectors;
-        ONE_CLICK_BUTTONS = DEFAULT_CONFIG.oneClickButtons;
-        PRICE_SELECTORS = DEFAULT_CONFIG.priceSelectors;
-        CURRENCY_SYMBOLS = DEFAULT_CONFIG.currencySymbols;
+        state.platformUrlPatterns = DEFAULT_CONFIG.platformUrlPatterns;
+        state.platformButtonSelectors = DEFAULT_CONFIG.platformButtonSelectors;
+        state.oneClickButtons = DEFAULT_CONFIG.oneClickButtons;
+        state.priceSelectors = DEFAULT_CONFIG.priceSelectors;
+        state.currencySymbols = DEFAULT_CONFIG.currencySymbols;
     }
+
+    // --- Extraction Logic ---
 
     const PriceExtractor = {
         findInSchema(obj) {
@@ -112,7 +114,7 @@
             }
             if (obj.price) return parseFloat(obj.price);
             for (const key of Object.keys(obj)) {
-                if (typeof obj[key] === 'object') {
+                if (typeof obj[key] === 'object' && obj[key] !== null) {
                     const nested = this.findInSchema(obj[key]);
                     if (nested) return nested;
                 }
@@ -121,9 +123,9 @@
         },
 
         extract() {
-            for (const selector of PRICE_SELECTORS) {
+            // 1. Try DOM selectors
+            for (const selector of state.priceSelectors) {
                 const priceEl = document.querySelector(selector);
-(selector);
                 if (priceEl) {
                     const text = priceEl.textContent || '';
                     const match = text.match(/[\d,]+\.?\d*/);
@@ -133,11 +135,11 @@
                 }
             }
             
+            // 2. Try Meta tags
             const ogPrice = document.querySelector('meta[property="og:price:amount"]');
-            if (ogPrice) {
-                return parseFloat(ogPrice.content);
-            }
+            if (ogPrice) return parseFloat(ogPrice.content);
             
+            // 3. Try JSON-LD
             const jsonLdScripts = document.querySelectorAll('[type="application/ld+json"]');
             for (const script of jsonLdScripts) {
                 try {
@@ -151,170 +153,106 @@
         }
     };
 
-    let interceptLock = Promise.resolve();
-    let lastDetectedProduct = null;
-    let hasShownInterception = false;
-    let observer = null;
-
-    function acquireInterceptLock() {
-        let release;
-        interceptLock = new Promise(resolve => { release = resolve; });
-        return release;
-    }
-
-    function extractPrice() {
-        return PriceExtractor.extract();
-    }
-
     function extractCurrency() {
         const pageText = document.body?.textContent || '';
-        for (const symbol of CURRENCY_SYMBOLS) {
-            const regex = new RegExp(symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[\\d,]+\\.?\\d*');
-            if (regex.test(pageText)) {
-                return symbol;
-            }
+        for (const symbol of state.currencySymbols) {
+            // Escape special regex chars
+            const escapedSymbol = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(escapedSymbol + '\\s*[\\d,]+\\.?\\d*');
+            if (regex.test(pageText)) return symbol;
         }
         return 'USD';
     }
 
     function extractProductInfo() {
         const titleSelectors = [
-            '#productTitle', 
-            'h1[itemprop="name"]', 
-            '[itemprop="name"]',
-            '.product-title', 
-            'h1[class*="product"]',
-            'h1'
+            '#productTitle', 'h1[itemprop="name"]', '[itemprop="name"]',
+            '.product-title', 'h1[class*="product"]', 'h1'
         ];
         
-        let title = null;
-        for (const selector of titleSelectors) {
-            const el = document.querySelector(selector);
-            if (el && el.textContent?.trim()) {
-                title = el.textContent.trim();
-                break;
-            }
-        }
-        
+        let title = document.querySelector(titleSelectors.join(','))?.textContent?.trim();
         if (!title) {
             title = document.title.split('|')[0].split('-')[0].split('–')[0].trim();
         }
 
-        const price = extractPrice();
-        const currency = extractCurrency();
-
         const merchant = window.location.hostname
-            .replace('www.', '')
-            .replace('checkout.', '')
-            .replace('store.', '')
+            .replace(/^www\.|^checkout\.|^store\./, '')
             .split('.')[0];
 
         return {
             title: title || 'Unknown Product',
-            price: price || 0,
-            currency: currency,
+            price: PriceExtractor.extract() || 0,
+            currency: extractCurrency(),
             merchant: merchant,
             url: window.location.href,
             timestamp: new Date().toISOString()
         };
     }
 
+    // --- Detection Logic ---
+
     function isCheckoutKeyword(text) {
         if (!text) return false;
         const lowerText = text.toLowerCase();
-        return CHECKOUT_KEYWORDS.some(keyword => lowerText.includes(keyword));
+        const keywords = [
+            'checkout', 'buy now', 'purchase', 'pay now', 'place order',
+            'complete order', 'submit order', 'finish checkout', 'finalize',
+            'secure checkout', 'make payment', 'confirm order', 'process order',
+            'continue to payment', 'proceed to payment', 'proceed to checkout',
+            'continue to checkout', 'review order', 'review and pay',
+            'buy with prime', 'pay with paypal', 'pay with apple pay'
+        ];
+        return keywords.some(k => lowerText.includes(k));
     }
 
     function isCheckoutPage() {
         const url = window.location.href.toLowerCase();
         const path = window.location.pathname.toLowerCase();
         
-        if (NEGATIVE_URL_PATTERNS.some(pattern => pattern.test(url) || pattern.test(path))) {
-            return false;
-        }
-        
-        return PLATFORM_URL_PATTERNS.some(pattern => pattern.test(url) || pattern.test(path));
-    }
-
-    function hasCheckoutQueryParam() {
-        const url = new URL(window.location.href);
-        const params = url.searchParams;
-        
-        for (const key of CHECKOUT_QUERY_PARAMS) {
-            if (params.has(key) || url.hash.includes(key)) {
-                return true;
-            }
-        }
-        
-        if (window.location.hash.includes('checkout') || window.location.hash.includes('payment')) {
-            return true;
-        }
-        
-        return false;
-    }
-
-    function hasCartIndicators() {
-        return CART_INDICATORS.some(selector => {
-            const el = document.querySelector(selector);
-            if (!el) return false;
-            
-            const text = el.textContent || el.value || '';
-            const match = text.match(/\d+/);
-            if (match && parseInt(match[0]) > 0) {
-                return true;
-            }
-            
-            return el.offsetParent !== null;
-        });
-    }
-
-    function hasPriceIndicators() {
-        return PRICE_INDICATORS.some(selector => {
-            const el = document.querySelector(selector);
-            return el && el.offsetParent !== null;
-        });
-    }
-
-    function hasCheckoutFormFields() {
-        const fields = document.querySelectorAll(CHECKOUT_FIELD_SELECTORS);
-        return fields.length >= 2;
+        if (state.negativeUrlPatterns.some(p => p.test(url) || p.test(path))) return false;
+        return state.platformUrlPatterns.some(p => p.test(url) || p.test(path));
     }
 
     function isLikelyCheckoutPage() {
-        return (
-            isCheckoutPage() ||
-            hasCheckoutQueryParam() ||
-            hasCartIndicators() ||
-            (hasPriceIndicators() && hasCheckoutFormFields())
+        // Check URL patterns
+        if (isCheckoutPage()) return true;
+
+        // Check query params / hash
+        const url = new URL(window.location.href);
+        const hasParam = state.checkoutQueryParams.some(key => 
+            url.searchParams.has(key) || url.hash.includes(key)
         );
+        if (hasParam || url.hash.includes('checkout') || url.hash.includes('payment')) return true;
+
+        // Check DOM indicators
+        const hasCart = state.cartIndicators.some(sel => {
+            const el = document.querySelector(sel);
+            if (!el) return false;
+            const match = (el.textContent || el.value || '').match(/\d+/);
+            return (match && parseInt(match[0]) > 0) || el.offsetParent !== null;
+        });
+        if (hasCart) return true;
+
+        const hasPrice = state.priceIndicators.some(sel => !!document.querySelector(sel)?.offsetParent);
+        const hasFields = document.querySelectorAll(state.checkoutFieldSelectors.join(',')).length >= 2;
+        
+        return hasPrice && hasFields;
     }
 
-    function shouldInterceptForm(form) {
-        if (!form) return false;
-        
-        const formAction = (form.action || '').toLowerCase();
-        const formId = (form.id || '').toLowerCase();
-        const formClass = (form.className || '').toLowerCase();
-        const formName = (form.name || '').toLowerCase();
-
-        if (FORM_KEYWORDS.some(k => formAction.includes(k) || formId.includes(k) || formClass.includes(k) || formName.includes(k))) {
-            return true;
-        }
-
-        const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
-        if (submitBtn) {
-            const btnText = (submitBtn.textContent || submitBtn.value || '').toLowerCase();
-            if (isCheckoutKeyword(btnText)) {
-                return true;
+    function findInShadowDOM(root, selector) {
+        let found = Array.from(root.querySelectorAll(selector));
+        const children = root.querySelectorAll('*');
+        for (const child of children) {
+            if (child.shadowRoot) {
+                found = found.concat(findInShadowDOM(child.shadowRoot, selector));
             }
         }
-
-        return false;
+        return found;
     }
 
     function findCheckoutButtons() {
         const buttons = [];
-        const allElements = document.querySelectorAll('button, input[type="submit"], a');
+        const allElements = findInShadowDOM(document, 'button, input[type="submit"], a');
 
         allElements.forEach(btn => {
             if (btn.dataset.orionIntercepted) return;
@@ -322,32 +260,20 @@
             const text = (btn.textContent || btn.value || '').toLowerCase();
             const id = (btn.id || '').toLowerCase();
             const className = (btn.className || '').toLowerCase();
-            const dataAttr = (
-                (btn.dataset?.testid || '') + ' ' +
-                (btn.dataset?.track || '') + ' ' +
-                (btn.dataset?.cy || '') + ' ' +
-                (btn.dataset?.name || '')
-            ).toLowerCase();
+            const dataAttr = [
+                btn.dataset.testid, btn.dataset.track, btn.dataset.cy, btn.dataset.name
+            ].filter(Boolean).join(' ').toLowerCase();
 
-            const isCheckoutBtn = 
+            const matchesSelector = state.platformButtonSelectors.some(sel => btn.matches(sel) || btn.closest(sel));
+            const matchesOneClick = state.oneClickButtons.some(sel => btn.matches(sel) || className.includes(sel.replace(/[.#]/g, '')));
+            
+            const isExplicitCheckout = 
                 isCheckoutKeyword(text) ||
-                PLATFORM_BUTTON_SELECTORS.some(sel => {
-                    try {
-                        return btn.matches(sel) || btn.closest(sel);
-                    } catch (e) { return false; }
-                }) ||
-                ONE_CLICK_BUTTONS.some(sel => {
-                    try {
-                        return btn.matches(sel) || className.includes(sel.replace(/[.#]/g, ''));
-                    } catch (e) { return false; }
-                }) ||
-                (id.includes('checkout') || id.includes('buy') || id.includes('pay') || id.includes('order')) ||
-                (className.includes('checkout') || className.includes('buy') || className.includes('pay') || 
-                 className.includes('apple-pay') || className.includes('google-pay') || className.includes('paypal')) ||
-                (dataAttr.includes('checkout') || dataAttr.includes('buy') || dataAttr.includes('pay') || 
-                 dataAttr.includes('order') || dataAttr.includes('submit'));
+                id.match(/checkout|buy|pay|order/) ||
+                className.match(/checkout|buy|pay|apple-pay|google-pay|paypal/) ||
+                dataAttr.match(/checkout|buy|pay|order|submit/);
 
-            if (isCheckoutBtn) {
+            if (matchesSelector || matchesOneClick || isExplicitCheckout) {
                 buttons.push(btn);
             }
         });
@@ -355,82 +281,33 @@
         return buttons;
     }
 
-    function attachKeyboardListeners() {
-        const checkoutFields = document.querySelectorAll(
-            'input[type="text"], input[type="email"], input[type="tel"], input[type="password"]'
-        );
+    // --- Interception Logic ---
 
-        checkoutFields.forEach(field => {
-            if (field.dataset.orionKeyIntercepted) return;
-            field.dataset.orionKeyIntercepted = 'true';
-
-            field.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    const form = field.closest('form');
-                    if (form && shouldInterceptForm(form)) {
-                        interceptCheckout(e);
-                    }
-                }
-            });
-        });
+    function acquireLock() {
+        let release;
+        state.interceptLock = new Promise(resolve => { release = resolve; });
+        return release;
     }
 
-    function attachOneClickListeners() {
-        ONE_CLICK_BUTTONS.forEach(selector => {
-            try {
-                const buttons = document.querySelectorAll(selector);
-                buttons.forEach(btn => {
-                    if (btn.dataset.orionOneClickIntercepted) return;
-                    btn.dataset.orionOneClickIntercepted = 'true';
-                    btn.addEventListener('click', interceptCheckout);
-                });
-            } catch (e) {}
-        });
-    }
-
-    async function checkCheckoutPage() {
-        if (hasShownInterception) return;
-        
-        if (isLikelyCheckoutPage()) {
-            const product = extractProductInfo();
-            lastDetectedProduct = product;
-            hasShownInterception = true;
-
-            const release = await acquireInterceptLock();
-            
-            try {
-                chrome.runtime.sendMessage({
-                    type: MESSAGE_TYPES.CHECKOUT_DETECTED,
-                    product: product
-                }, () => {
-                    setTimeout(release, CONFIG.INTERCEPT_TIMEOUT);
-                });
-            } catch (e) {
-                release();
-            }
-        }
-    }
-
-    function interceptCheckout(event) {
-        if (hasShownInterception) {
+    async function handleInterception(event = null) {
+        if (state.hasShownInterception) {
             if (event) {
                 event.preventDefault();
                 event.stopPropagation();
             }
             return;
         }
-        
-        const product = extractProductInfo();
-        lastDetectedProduct = product;
-        hasShownInterception = true;
 
         if (event) {
             event.preventDefault();
             event.stopPropagation();
         }
 
-        const release = acquireInterceptLock();
+        const product = extractProductInfo();
+        state.hasShownInterception = true;
         
+        const release = acquireLock();
+
         try {
             chrome.runtime.sendMessage({
                 type: MESSAGE_TYPES.CHECKOUT_DETECTED,
@@ -439,162 +316,136 @@
                 setTimeout(release, CONFIG.INTERCEPT_TIMEOUT);
             });
         } catch (e) {
+            console.error('[Orion] Message send failed', e);
             release();
         }
     }
 
-    function handlePopupMessage(message, sender, sendResponse) {
-        if (message.type === MESSAGE_TYPES.CANCEL_CHECKOUT) {
-            console.log('[Orion] Checkout cancelled by user');
-            window.history.back();
-            hasShownInterception = false;
-        }
-        
-        if (message.type === MESSAGE_TYPES.PROCEED_CHECKOUT) {
-            console.log('[Orion] User decided to proceed');
-            hasShownInterception = false;
-        }
-        
-        sendResponse({ status: 'ok' });
-        return true;
-    }
-
-    chrome.runtime.onMessage.addListener(handlePopupMessage);
-
-    function attachInterceptors() {
+    function attachListeners() {
+        // Buttons
         const buttons = findCheckoutButtons();
-        
         buttons.forEach(btn => {
             if (!btn.dataset.orionIntercepted) {
-                btn.addEventListener('click', interceptCheckout);
+                btn.addEventListener('click', handleInterception);
                 btn.dataset.orionIntercepted = 'true';
             }
         });
 
-        attachFormListeners();
-        attachKeyboardListeners();
-        attachOneClickListeners();
-    }
-
-    function runDetectionPass(delay) {
-        setTimeout(() => {
-            attachInterceptors();
-            checkCheckoutPage();
-        }, delay);
-    }
-
-    let formInterceptDebounce = null;
-    function debouncedIntercept(event) {
-        if (formInterceptDebounce) return;
-        formInterceptDebounce = true;
-        interceptCheckout(event);
-        setTimeout(() => { formInterceptDebounce = null; }, CONFIG.DEBOUNCE_DELAY);
-    }
-
-    let observerThrottleTimeout = null;
-    function throttledObserverCallback(callback) {
-        if (observerThrottleTimeout) return;
-        observerThrottleTimeout = setTimeout(() => {
-            observerThrottleTimeout = null;
-            callback();
-        }, CONFIG.DEBOUNCE_DELAY);
-    }
-
-    function attachFormListeners() {
-        const forms = document.querySelectorAll('form');
-        forms.forEach(form => {
+        // Forms
+        document.querySelectorAll('form').forEach(form => {
             if (form.dataset.orionFormIntercepted) return;
             form.dataset.orionFormIntercepted = 'true';
-
+            
             form.addEventListener('submit', (e) => {
-                if (shouldInterceptForm(form)) {
-                    debouncedIntercept(e);
+                // Check if form is relevant
+                const formKeywords = ['checkout', 'order', 'payment'];
+                const formStr = (form.action + form.id + form.className + form.name).toLowerCase();
+                const isRelevant = formKeywords.some(k => formStr.includes(k));
+                
+                // Check submit button text
+                const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+                const btnText = (submitBtn?.textContent || submitBtn?.value || '').toLowerCase();
+                
+                if (isRelevant || isCheckoutKeyword(btnText)) {
+                    if (!state.formInterceptDebounce) {
+                        state.formInterceptDebounce = true;
+                        handleInterception(e);
+                        setTimeout(() => { state.formInterceptDebounce = null; }, CONFIG.DEBOUNCE_DELAY);
+                    }
+                }
+            });
+        });
+
+        // Keyboard (Enter key)
+        const inputs = document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"]');
+        inputs.forEach(input => {
+            if (input.dataset.orionKeyIntercepted) return;
+            input.dataset.orionKeyIntercepted = 'true';
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    const form = input.closest('form');
+                    // Minimal check for form relevance
+                    if (form && (form.action.includes('checkout') || form.id.includes('checkout'))) {
+                        handleInterception(e);
+                    }
                 }
             });
         });
     }
 
-    function setupScopedObserver() {
-        if (observer) return;
-        
-        const scopedContainers = document.querySelectorAll(
-            CONFIG.SCOPED_OBSERVER_SELECTORS.join(', ')
-        );
-        
-        const target = scopedContainers.length > 0 ? document.body : document.body;
-        
-        observer = new MutationObserver(() => {
-            throttledObserverCallback(() => {
-                attachInterceptors();
-                checkCheckoutPage();
-            });
-        });
-        
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['class', 'data-testid', 'disabled', 'aria-disabled']
-        });
-    }
+    // --- Initialization & Observers ---
 
-    function setupIframeDetection() {
-        const checkIframes = () => {
-            const iframes = document.querySelectorAll('iframe');
-            iframes.forEach(iframe => {
-                try {
-                    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-                    if (iframeDoc) {
-                        const iframeContent = iframeDoc.body?.textContent?.toLowerCase() || '';
-                        if (IFRAME_CHECKOUT_KEYWORDS.some(k => iframeContent.includes(k))) {
-                            const iframeButtons = iframeDoc.querySelectorAll('button, input[type="submit"], a');
-                            iframeButtons.forEach(btn => {
-                                if (!btn.dataset.orionIframeIntercepted) {
-                                    btn.dataset.orionIframeIntercepted = 'true';
-                                    btn.addEventListener('click', interceptCheckout);
-                                }
-                            });
-                        }
-                    }
-                } catch (e) {}
+    function setupObservers() {
+        // Main DOM Observer
+        if (!state.observer) {
+            state.observer = new MutationObserver(() => {
+                if (!state.observerThrottleTimeout) {
+                    state.observerThrottleTimeout = setTimeout(() => {
+                        state.observerThrottleTimeout = null;
+                        attachListeners();
+                        if (isLikelyCheckoutPage()) handleInterception();
+                    }, CONFIG.DEBOUNCE_DELAY);
+                }
             });
+            
+            state.observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['class', 'disabled']
+            });
+        }
+
+        // History / Navigation Observer
+        const debouncedCheck = () => {
+            if (state.historyDebounceTimeout) clearTimeout(state.historyDebounceTimeout);
+            state.historyDebounceTimeout = setTimeout(() => {
+                 if (isLikelyCheckoutPage()) handleInterception();
+            }, CONFIG.DEBOUNCE_DELAY);
         };
-        
-        const iframeObserver = new MutationObserver(checkIframes);
-        iframeObserver.observe(document.body, { childList: true, subtree: true });
-        checkIframes();
-    }
 
-    let historyDebounceTimeout = null;
-    function debouncedHistoryCheck() {
-        if (historyDebounceTimeout) clearTimeout(historyDebounceTimeout);
-        historyDebounceTimeout = setTimeout(checkCheckoutPage, CONFIG.DEBOUNCE_DELAY);
+        window.addEventListener('popstate', debouncedCheck);
+        window.addEventListener('hashchange', debouncedCheck);
+        
+        const originalPushState = history.pushState;
+        history.pushState = function() {
+            originalPushState.apply(this, arguments);
+            debouncedCheck();
+        };
     }
 
     function init() {
+        // Only run on http/https pages
+        if (!window.location.protocol.startsWith('http')) {
+            return;
+        }
+
+        // Check if extension context is still valid (prevents errors on extension reload)
+        if (!chrome.runtime?.id) {
+            return;
+        }
+
         loadConfig().then(() => {
-            CONFIG.DETECTION_DELAYS.forEach(delay => runDetectionPass(delay));
+            CONFIG.DETECTION_DELAYS.forEach(delay => 
+                setTimeout(() => {
+                    attachListeners();
+                    if (isLikelyCheckoutPage()) handleInterception();
+                }, delay)
+            );
 
-            checkCheckoutPage();
-            
-            setupScopedObserver();
-            setupIframeDetection();
+            setupObservers();
+            console.log('[Orion] Monitoring initialized');
+        });
 
-            const originalPushState = history.pushState;
-            history.pushState = function() {
-                originalPushState.apply(this, arguments);
-                debouncedHistoryCheck();
-            };
-
-            window.addEventListener('popstate', debouncedHistoryCheck);
-            window.addEventListener('hashchange', debouncedHistoryCheck);
-
-            window.addEventListener('beforeunload', () => {
-                if (observer) observer.disconnect();
-                if (historyDebounceTimeout) clearTimeout(historyDebounceTimeout);
-            });
-
-            console.log('[Orion] Extension active - checkout monitoring enabled');
+        // Listen for messages from popup/background
+        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            if (message.type === MESSAGE_TYPES.CANCEL_CHECKOUT) {
+                window.history.back();
+                state.hasShownInterception = false;
+            } else if (message.type === MESSAGE_TYPES.PROCEED_CHECKOUT) {
+                state.hasShownInterception = false;
+            }
+            sendResponse({ status: 'ok' });
         });
     }
 
@@ -604,21 +455,4 @@
         init();
     }
 
-    if (typeof window !== 'undefined') {
-        window.Orion = {
-            isCheckoutPage,
-            isCheckoutKeyword,
-            shouldInterceptForm,
-            findCheckoutButtons,
-            extractProductInfo,
-            extractPrice,
-            extractCurrency,
-            interceptCheckout,
-            isLikelyCheckoutPage,
-            hasCartIndicators,
-            hasPriceIndicators,
-            hasCheckoutFormFields,
-            hasCheckoutQueryParam
-        };
-    }
 })();

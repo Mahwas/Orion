@@ -3,7 +3,11 @@ const MESSAGE_TYPES = {
     GET_PENDING_PRODUCT: 'GET_PENDING_PRODUCT',
     CLEAR_PENDING_PRODUCT: 'CLEAR_PENDING_PRODUCT',
     PURCHASE_CONFIRMED: 'PURCHASE_CONFIRMED',
-    GET_BUDGET_STATUS: 'GET_BUDGET_STATUS'
+    GET_BUDGET_STATUS: 'GET_BUDGET_STATUS',
+    CANCEL_CHECKOUT: 'CANCEL_CHECKOUT',
+    PROCEED_CHECKOUT: 'PROCEED_CHECKOUT',
+    WAIT_24H: 'WAIT_24H',
+    SAVE_TO_WISHLIST: 'SAVE_TO_WISHLIST'
 };
 
 const DEFAULTS = {
@@ -15,25 +19,19 @@ const DEFAULTS = {
     spendingHistory: []
 };
 
-let pendingProduct = null;
+// --- Helpers ---
 
 function getMonthKey() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function shouldResetBudget(lastResetMonth) {
-    const currentMonth = getMonthKey();
-    return lastResetMonth !== currentMonth;
-}
-
 async function initializeBudget() {
-    const result = await chrome.storage.local.get([
-        'lastResetMonth', 'spendingHistory', 'budgetRemaining', 'budget', 'currency'
-    ]);
+    const keys = ['lastResetMonth', 'spendingHistory', 'budgetRemaining', 'budget', 'currency'];
+    const result = await chrome.storage.local.get(keys);
     const currentMonth = getMonthKey();
     
-    if (shouldResetBudget(result.lastResetMonth)) {
+    if (result.lastResetMonth !== currentMonth) {
         const currentBudget = result.budgetRemaining ?? result.budget ?? DEFAULTS.budget;
         await chrome.storage.local.set({
             lastResetMonth: currentMonth,
@@ -43,11 +41,12 @@ async function initializeBudget() {
     }
 }
 
+// --- Action Handlers ---
+
 async function recordPurchase(product) {
-    const result = await chrome.storage.local.get([
-        'spendingHistory', 'budgetRemaining', 'budget', 'currency'
-    ]);
+    const result = await chrome.storage.local.get(['spendingHistory', 'budgetRemaining', 'budget']);
     const history = result.spendingHistory || [];
+    
     const purchase = {
         ...product,
         month: getMonthKey(),
@@ -56,69 +55,128 @@ async function recordPurchase(product) {
     
     history.push(purchase);
     
+    // Calculate totals
+    const monthKey = getMonthKey();
     const totalSpent = history
-        .filter(p => p.month === getMonthKey())
+        .filter(p => p.month === monthKey)
         .reduce((sum, p) => sum + (p.price || 0), 0);
     
     const budget = result.budget || DEFAULTS.budget;
     const remaining = Math.max(0, budget - totalSpent);
     
     await chrome.storage.local.set({
-        spendingHistory: history.slice(-100),
+        spendingHistory: history.slice(-100), // Keep last 100
         budgetRemaining: remaining
     });
     
     return { totalSpent, remaining, budget };
 }
 
+async function handleWishlist(product) {
+    if (!product) return { status: 'error', message: 'No product to save' };
+    
+    try {
+        const { wishlist = [] } = await chrome.storage.local.get('wishlist');
+        wishlist.push({
+            ...product,
+            timestamp: new Date().toISOString()
+        });
+        
+        await chrome.storage.local.set({ 
+            wishlist,
+            showIntervention: false,
+            pendingProduct: null
+        });
+        return { status: 'saved_to_wishlist' };
+    } catch (error) {
+        console.error('[Orion] Error saving to wishlist:', error);
+        return { status: 'error', message: error.message };
+    }
+}
+
+async function handleWait24H(product) {
+    if (!product) return { status: 'error', message: 'No product to wait for' };
+    
+    try {
+        const { waitingItems = [] } = await chrome.storage.local.get('waitingItems');
+        waitingItems.push({
+            ...product,
+            expiry: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+            timestamp: new Date().toISOString()
+        });
+        
+        await chrome.storage.local.set({ 
+            waitingItems,
+            showIntervention: false,
+            pendingProduct: null
+        });
+        return { status: 'waiting_set' };
+    } catch (error) {
+        console.error('[Orion] Error setting wait timer:', error);
+        return { status: 'error', message: error.message };
+    }
+}
+
+async function handleClearPendingProduct() {
+    try {
+        await chrome.storage.local.set({ 
+            pendingProduct: null,
+            showIntervention: false 
+        });
+        return { status: 'cleared' };
+    } catch (error) {
+        return { status: 'error', message: error.message };
+    }
+}
+
+// --- UI Logic ---
+
 async function openPopup() {
     try {
         await chrome.action.openPopup();
     } catch (e) {
-        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (tabs[0] && pendingProduct) {
-            const tabId = tabs[0].id;
-            
+        // Fallback: Try injecting overlay
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id) {
             try {
-                const [isCheckout] = await chrome.tabs.executeScript(tabId, {
-                    code: `window.Orion && window.Orion.isLikelyCheckoutPage ? window.Orion.isLikelyCheckoutPage() : false`
+                await chrome.scripting.executeScript({
+                    target: { tabId: tab.id },
+                    files: ['overlay.js']
                 });
-                
-                if (!isCheckout) {
-                    await chrome.storage.local.set({ 
-                        pendingProduct,
-                        showIntervention: true 
-                    });
-                    chrome.tabs.reload(tabId, { bypassCache: true });
-                }
             } catch (err) {
-                await chrome.storage.local.set({ 
-                    pendingProduct,
-                    showIntervention: true 
-                });
-                chrome.tabs.reload(tabId, { bypassCache: true });
+                console.error('[Orion] Overlay injection failed:', err);
+                // Final Fallback: Windows API
+                try {
+                    await chrome.windows.create({
+                        url: 'popup.html',
+                        type: 'popup',
+                        width: 400,
+                        height: 600
+                    });
+                } catch (winErr) {
+                    console.error('[Orion] Window creation failed:', winErr);
+                }
             }
         }
     }
 }
 
 async function handleCheckoutDetected(message) {
-    pendingProduct = message.product;
-    
     try {
         await initializeBudget();
         
-        const result = await chrome.storage.local.get([
-            'budget', 'currency', 'budgetRemaining', 'spendingHistory'
-        ]);
+        const result = await chrome.storage.local.get(['budget', 'currency', 'budgetRemaining', 'spendingHistory']);
         const budget = result.budget ?? DEFAULTS.budget;
         const currency = result.currency ?? DEFAULTS.currency;
         
         const history = result.spendingHistory || [];
-        const monthHistory = history.filter(p => p.month === getMonthKey());
-        const totalSpent = monthHistory.reduce((sum, p) => sum + (p.price || 0), 0);
+        const currentMonth = getMonthKey();
+        const totalSpent = history
+            .filter(p => p.month === currentMonth)
+            .reduce((sum, p) => sum + (p.price || 0), 0);
         
-        const updatedRemaining = Math.max(0, budget - (totalSpent + (message.product.price || 0)));
+        const productPrice = message.product.price || 0;
+        const updatedRemaining = Math.max(0, budget - (totalSpent + productPrice));
         
         await chrome.storage.local.set({ 
             pendingProduct: message.product,
@@ -137,70 +195,69 @@ async function handleCheckoutDetected(message) {
     }
 }
 
-async function handleGetPendingProduct() {
-    return { product: pendingProduct };
-}
+// --- Message Router ---
 
-async function handleClearPendingProduct() {
-    pendingProduct = null;
-    try {
-        await chrome.storage.local.set({ 
-            pendingProduct: null,
-            showIntervention: false 
-        });
-        return { status: 'cleared' };
-    } catch (error) {
-        console.error('[Orion] Error clearing product:', error);
-        return { status: 'error', message: error.message };
-    }
-}
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // Wrap in async function to handle await properly
+    (async () => {
+        try {
+            let result;
+            
+            switch (message.type) {
+                case MESSAGE_TYPES.CHECKOUT_DETECTED:
+                    result = await handleCheckoutDetected(message);
+                    break;
+                    
+                case MESSAGE_TYPES.GET_PENDING_PRODUCT:
+                    const { pendingProduct } = await chrome.storage.local.get('pendingProduct');
+                    result = { product: pendingProduct };
+                    break;
+                    
+                case MESSAGE_TYPES.CLEAR_PENDING_PRODUCT:
+                case MESSAGE_TYPES.CANCEL_CHECKOUT:
+                case MESSAGE_TYPES.PROCEED_CHECKOUT:
+                    result = await handleClearPendingProduct();
+                    break;
+                    
+                case MESSAGE_TYPES.PURCHASE_CONFIRMED:
+                    if (message.product) await recordPurchase(message.product);
+                    result = { status: 'recorded' };
+                    break;
+                    
+                case MESSAGE_TYPES.GET_BUDGET_STATUS:
+                    await initializeBudget();
+                    const status = await chrome.storage.local.get(['budgetRemaining', 'budget', 'totalSpentThisMonth']);
+                    result = { 
+                        remaining: status.budgetRemaining ?? DEFAULTS.budget,
+                        budget: status.budget ?? DEFAULTS.budget,
+                        spent: status.totalSpentThisMonth ?? 0
+                    };
+                    break;
 
-chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
-    try {
-        let result;
-        
-        switch (message.type) {
-            case MESSAGE_TYPES.CHECKOUT_DETECTED:
-                result = await handleCheckoutDetected(message);
-                break;
-                
-            case MESSAGE_TYPES.GET_PENDING_PRODUCT:
-                result = await handleGetPendingProduct();
-                break;
-                
-            case MESSAGE_TYPES.CLEAR_PENDING_PRODUCT:
-                result = await handleClearPendingProduct();
-                break;
-                
-            case MESSAGE_TYPES.PURCHASE_CONFIRMED:
-                if (message.product) {
-                    await recordPurchase(message.product);
-                }
-                result = { status: 'recorded' };
-                break;
-                
-            case MESSAGE_TYPES.GET_BUDGET_STATUS:
-                await initializeBudget();
-                const status = await chrome.storage.local.get(['budgetRemaining', 'budget', 'totalSpentThisMonth']);
-                result = { 
-                    remaining: status.budgetRemaining ?? DEFAULTS.budget,
-                    budget: status.budget ?? DEFAULTS.budget,
-                    spent: status.totalSpentThisMonth ?? 0
-                };
-                break;
-                
-            default:
-                result = { status: 'unknown_message_type' };
+                case MESSAGE_TYPES.WAIT_24H:
+                    const { pendingProduct: waitProd } = await chrome.storage.local.get('pendingProduct');
+                    result = await handleWait24H(waitProd);
+                    break;
+
+                case MESSAGE_TYPES.SAVE_TO_WISHLIST:
+                    const { pendingProduct: wishProd } = await chrome.storage.local.get('pendingProduct');
+                    result = await handleWishlist(wishProd);
+                    break;
+                    
+                default:
+                    result = { status: 'unknown_message_type' };
+            }
+            sendResponse(result);
+        } catch (error) {
+            console.error('[Orion] Message handler error:', error);
+            sendResponse({ status: 'error', message: error.message });
         }
-        
-        sendResponse(result);
-    } catch (error) {
-        console.error('[Orion] Message handler error:', error);
-        sendResponse({ status: 'error', message: error.message });
-    }
+    })();
     
-    return true;
+    return true; // Keep channel open for async response
 });
+
+// --- Initialization ---
 
 chrome.runtime.onInstalled.addListener(async () => {
     try {
