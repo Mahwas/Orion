@@ -105,6 +105,51 @@
 
     // --- Extraction Logic ---
 
+    // --- Extraction Logic ---
+
+    // Helper to check if an element is visible
+    function isElementVisible(el) {
+        if (!el || !el.offsetParent) return false; // Not in DOM or hidden by display:none
+        const style = window.getComputedStyle(el);
+        return style.width !== '0' && style.height !== '0' && style.opacity !== '0' &&
+               style.visibility !== 'hidden' && style.display !== 'none';
+    }
+
+    // Helper to find price-like numbers in text
+    function findPriceInText(text, currencySymbols) {
+        if (!text) return null;
+        // Regex to find numbers that look like prices, potentially with currency symbols
+        // Handles formats like $1,234.56, €1.234,56, 1.234,56€, 1234.56
+        const priceRegex = new RegExp(
+            `(${currencySymbols.map(s => `\\${s}`).join('|')}|\\b)\\s*` + // Optional currency symbol
+            `(\\d{1,3}(?:[.,]\\d{3})*(?:[.,]\\d{2})?|\\d+(?:[.,]\\d+)?)\\s*` + // Price number
+            `(?:(${currencySymbols.map(s => `\\${s}`).join('|')})|\\b)`, 'g' // Optional trailing currency symbol
+        );
+
+        let match;
+        let bestPrice = null;
+
+        while ((match = priceRegex.exec(text)) !== null) {
+            let priceStr = match[2];
+            // Normalize: remove thousands separators, replace comma decimal with dot
+            priceStr = priceStr.replace(/,/g, ''); // Remove all commas
+            if (priceStr.match(/\d+\.\d{2},\d{2}/)) { // Example: 1.234,56
+                priceStr = priceStr.replace(/\./g, '').replace(/,/g, '.');
+            } else if (priceStr.match(/\d+,\d{2}/)) { // Example: 123,45
+                 priceStr = priceStr.replace(/,/g, '.');
+            }
+            
+            const price = parseFloat(priceStr);
+            if (!isNaN(price) && price > 0) {
+                // Heuristic: prefer larger prices (might indicate product price over sub-total)
+                if (bestPrice === null || price > bestPrice) {
+                    bestPrice = price;
+                }
+            }
+        }
+        return bestPrice;
+    }
+
     const PriceExtractor = {
         findInSchema(obj) {
             if (!obj) return null;
@@ -123,33 +168,60 @@
         },
 
         extract() {
-            // 1. Try DOM selectors
-            for (const selector of state.priceSelectors) {
-                const priceEl = document.querySelector(selector);
-                if (priceEl) {
-                    const text = priceEl.textContent || '';
-                    const match = text.match(/[\d,]+\.?\d*/);
-                    if (match) {
-                        return parseFloat(match[0].replace(/,/g, ''));
-                    }
-                }
-            }
-            
-            // 2. Try Meta tags
-            const ogPrice = document.querySelector('meta[property="og:price:amount"]');
-            if (ogPrice) return parseFloat(ogPrice.content);
-            
-            // 3. Try JSON-LD
+            let extractedPrice = null;
+
+            // 1. Try JSON-LD (most reliable semantic data)
             const jsonLdScripts = document.querySelectorAll('[type="application/ld+json"]');
             for (const script of jsonLdScripts) {
                 try {
                     const data = JSON.parse(script.textContent);
                     const price = this.findInSchema(data);
-                    if (price) return price;
-                } catch (e) {}
+                    if (price) return price; // Return immediately if found in schema
+                } catch (e) { /* console.error("JSON-LD parse error:", e); */ }
             }
+
+            // 2. Try Meta tags (Open Graph price)
+            const ogPrice = document.querySelector('meta[property="og:price:amount"]');
+            if (ogPrice && ogPrice.content) return parseFloat(ogPrice.content);
             
-            return null;
+            // 3. Try DOM selectors (more robust approach)
+            const allPriceElements = document.querySelectorAll(state.priceSelectors.join(',') + ', [class*="price"], [id*="price"]');
+            let potentialPrices = [];
+
+            allPriceElements.forEach(el => {
+                if (!isElementVisible(el)) return;
+
+                const text = el.textContent || el.value || '';
+                const priceValue = findPriceInText(text, state.currencySymbols);
+                if (priceValue !== null) {
+                    potentialPrices.push({ price: priceValue, element: el, text: text });
+                }
+            });
+
+            // Heuristic to pick the "best" price if multiple are found
+            if (potentialPrices.length > 0) {
+                // First, look for a clear sale price or current price, prioritizing elements that are explicitly marked
+                const salePriceKeywords = /sale|current|deal|offer|lower|discount|final/i;
+                const amazonCurrentPriceIndicator = el => el.closest('.a-price-whole') || el.closest('.a-price-fraction') || el.closest('[data-a-color="price"]');
+                const bestMatch = potentialPrices.find(p => 
+                    salePriceKeywords.test(p.element.className || '') || 
+                    salePriceKeywords.test(p.element.id || '') ||
+                    amazonCurrentPriceIndicator(p.element)
+                );
+
+                if (bestMatch) {
+                    extractedPrice = bestMatch.price;
+                } else {
+                    // If no explicit "sale" or "current" indicator, take the lowest price found
+                    potentialPrices.sort((a, b) => a.price - b.price); // Sort ascending
+                    extractedPrice = potentialPrices[0].price;
+                }
+            }
+
+            if (extractedPrice !== null) return extractedPrice;
+
+            // 4. Fallback to broad text search in the body if specific selectors fail
+            return findPriceInText(document.body.innerText, state.currencySymbols);
         }
     };
 
@@ -166,13 +238,32 @@
 
     function extractProductInfo() {
         const titleSelectors = [
-            '#productTitle', 'h1[itemprop="name"]', '[itemprop="name"]',
-            '.product-title', 'h1[class*="product"]', 'h1'
+            '#productTitle', // Amazon specific
+            'h1.product-title', // Generic
+            'span.a-size-large.product-title-word-break', // Amazon specific
+            'h1[itemprop="name"]', // Semantic
+            '[itemprop="name"]', // Semantic
+            '.product-title', // Generic
+            'h1[class*="product"]', // Generic
+            'h1' // Broad
         ];
         
-        let title = document.querySelector(titleSelectors.join(','))?.textContent?.trim();
+        let title = '';
+        for (const selector of titleSelectors) {
+            const el = document.querySelector(selector);
+            if (el && el.textContent?.trim()) {
+                title = el.textContent.trim();
+                break;
+            }
+        }
+        
+        // Fallback to document.title if no specific title found
         if (!title) {
-            title = document.title.split('|')[0].split('-')[0].split('–')[0].trim();
+            // Split by common separators and take the first part
+            title = document.title.split('|')[0]
+                                 .split('-')[0]
+                                 .split('–')[0]
+                                 .trim();
         }
 
         const merchant = window.location.hostname
@@ -180,7 +271,7 @@
             .split('.')[0];
 
         return {
-            title: title || 'Unknown Product',
+            title: title || 'Unknown Product', // Default if still no title
             price: PriceExtractor.extract() || 0,
             currency: extractCurrency(),
             merchant: merchant,
@@ -269,9 +360,9 @@
             
             const isExplicitCheckout = 
                 isCheckoutKeyword(text) ||
-                id.match(/checkout|buy|pay|order/) ||
-                className.match(/checkout|buy|pay|apple-pay|google-pay|paypal/) ||
-                dataAttr.match(/checkout|buy|pay|order|submit/);
+                id.match(/checkout|buy|pay|order/i) || // Added 'i' flag for case-insensitivity
+                className.match(/checkout|buy|pay|apple-pay|google-pay|paypal/i) || // Added 'i' flag
+                dataAttr.match(/checkout|buy|pay|order|submit/i); // Added 'i' flag
 
             if (matchesSelector || matchesOneClick || isExplicitCheckout) {
                 buttons.push(btn);

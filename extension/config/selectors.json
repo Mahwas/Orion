@@ -28,7 +28,8 @@
     "onestepcheckout",
     "onepage\\/checkout",
     "commerce\\/checkout",
-    "checkout\\/step"
+    "checkout\\/step",
+    "amazon\\..*\\/(gp|buy|checkout|cart)"
   ],
   "checkoutQueryParams": [
     "checkout",
@@ -107,7 +108,13 @@
     "button[type=\"submit\"][value=\"Continue\"]",
     ".review-buttons-container button",
     ".opc-btn-checkout",
-    "#onestepcheckout-button"
+    "#onestepcheckout-button",
+    "#hlb-ptc-btn-native",
+    "#confirmButton",
+    "#submitOrderButtonId",
+    "#turbo-checkout-pyo-button",
+    "input[name='submit.buy-now']",
+    "input[name='submit.place-order']"
   ],
   "oneClickButtons": [
     ".apple-pay-button",
@@ -126,7 +133,8 @@
     "[class*=\"one-click\"]",
     "[data-one-click]",
     ".amazon-pay-button",
-    "#amazon-pay-button"
+    "#amazon-pay-button",
+    "#buy-now-button"
   ],
   "cartIndicators": [
     ".cart-count",
@@ -163,7 +171,11 @@
     ".grand-total",
     ".cart-total",
     ".subtotal",
-    ".checkout-total"
+    ".checkout-total",
+    ".a-price-whole",
+    ".a-price-fraction",
+    "#priceblock_saleprice",
+    "#displayed_price_total"
   ],
   "checkoutFieldSelectors": [
     "[name=\"email\"]",
@@ -201,7 +213,12 @@
     ".subtotal",
     "#subtotals-market-place-table",
     ".price__current",
-    ".price__sale"
+    ".price__sale",
+    "#actualPriceValue",
+    "#price_value",
+    "#current_price",
+    ".buyingPrice",
+    ".a-color-price"
   ],
   "currencySymbols": [
     "$",
