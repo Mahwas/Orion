@@ -1,5 +1,5 @@
 from core.database import SessionLocal, engine, Base
-from models.db_models import Transaction
+from models.db_models import Transaction, User, Entitlement
 from datetime import datetime, timezone, timedelta
 
 def seed_db():
@@ -16,6 +16,23 @@ def seed_db():
     print("Seeding with mock transactions...")
     
     now = datetime.now(timezone.utc)
+
+    # Create users with entitlements
+    users = [
+        User(id="u123", email="alice@example.com"),
+        User(id="u124", email="bob@example.com"),
+        User(id="u125", email="charlie@example.com"),
+    ]
+    db.add_all(users)
+    db.flush()
+
+    # Give each user some starting credits
+    entitlements = [
+        Entitlement(user_id="u123", credits_balance=3, pro_active=False),
+        Entitlement(user_id="u124", credits_balance=1, pro_active=False),
+        Entitlement(user_id="u125", credits_balance=0, pro_active=True),  # Pro user
+    ]
+    db.add_all(entitlements)
     
     # User u123: Consistent bills but recent impulse buy
     transactions = [
@@ -39,7 +56,7 @@ def seed_db():
     
     db.add_all(transactions)
     db.commit()
-    print(f"Successfully added {len(transactions)} mock transactions.")
+    print(f"Successfully added {len(transactions)} mock transactions and {len(users)} users with entitlements.")
     
     db.close()
 

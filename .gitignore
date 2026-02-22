@@ -18,3 +18,4 @@ __pycache__/
 .env
 *.db
 .agents
+demo_ui.html
