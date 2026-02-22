@@ -197,47 +197,55 @@ def add_expense_to_history(extracted_data):
     print(f"✓ Expense saved to {expenses_file}")
 
 
+import threading
+
+def _process_click(x, y):
+    print(f"Clicked at {x},{y} → capturing region")
+    image_path = capture_cursor_region(x, y)
+    result = send_to_gemini(image_path)
+    
+    extracted_data = result["extracted_data"]
+    
+    # Get enhanced recommendations from agent if available
+    if AGENT_AVAILABLE:
+        print("\n" + "=" * 60)
+        print("RUNNING AGENT ANALYSIS...")
+        print("=" * 60)
+        try:
+            # Using asyncio.run here is safe because it's in a fresh background thread
+            agent_recommendations = asyncio.run(get_agent_recommendations(extracted_data))
+            extracted_data = enhance_extracted_data(extracted_data, agent_recommendations)
+            print("✓ Agent analysis complete")
+        except Exception as e:
+            print(f"⚠ Agent analysis failed: {e}")
+
+    print("\n" + "=" * 60)
+    print("EXTRACTED DATA:")
+    print("=" * 60)
+    print(json.dumps({k: v for k, v in extracted_data.items() if k not in ["agent_recommendations"]}, indent=2))
+    
+    if "should_buy" in extracted_data:
+        print("\n" + "=" * 60)
+        print("AGENT RECOMMENDATION:")
+        print("=" * 60)
+        print(f"Should Buy: {extracted_data['should_buy']}")
+        print(f"Reasoning: {extracted_data['agent_reasoning']}")
+    
+    print("\n" + "=" * 60)
+    print("GEMINI ADVICE & PREDICTIONS:")
+    print("=" * 60)
+    print(result["gemini_advice"])
+    print("=" * 60 + "\n")
+    
+    # Save to expense history with agent recommendations
+    add_expense_to_history(extracted_data)
+
+
 def on_click(x, y, button, pressed):
     """Handle mouse click events."""
     if pressed:
-        print(f"Clicked at {x},{y} → capturing region")
-        image_path = capture_cursor_region(x, y)
-        result = send_to_gemini(image_path)
-        
-        extracted_data = result["extracted_data"]
-        
-        # Get enhanced recommendations from agent if available
-        if AGENT_AVAILABLE:
-            print("\n" + "=" * 60)
-            print("RUNNING AGENT ANALYSIS...")
-            print("=" * 60)
-            try:
-                agent_recommendations = asyncio.run(get_agent_recommendations(extracted_data))
-                extracted_data = enhance_extracted_data(extracted_data, agent_recommendations)
-                print("✓ Agent analysis complete")
-            except Exception as e:
-                print(f"⚠ Agent analysis failed: {e}")
-
-        print("\n" + "=" * 60)
-        print("EXTRACTED DATA:")
-        print("=" * 60)
-        print(json.dumps({k: v for k, v in extracted_data.items() if k not in ["agent_recommendations"]}, indent=2))
-        
-        if "should_buy" in extracted_data:
-            print("\n" + "=" * 60)
-            print("AGENT RECOMMENDATION:")
-            print("=" * 60)
-            print(f"Should Buy: {extracted_data['should_buy']}")
-            print(f"Reasoning: {extracted_data['agent_reasoning']}")
-        
-        print("\n" + "=" * 60)
-        print("GEMINI ADVICE & PREDICTIONS:")
-        print("=" * 60)
-        print(result["gemini_advice"])
-        print("=" * 60 + "\n")
-        
-        # Save to expense history with agent recommendations
-        add_expense_to_history(extracted_data)
+        # Pynput callbacks block system inputs on some OS. Spawn a thread to process!
+        threading.Thread(target=_process_click, args=(x, y)).start()
 
 
 def on_key_press(key):

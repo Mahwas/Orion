@@ -1,16 +1,21 @@
-from Orion.backend.models.schemas import ProductData, UserData
-from Orion.backend.core.agent import execute_agent
-
+import sys
 from pathlib import Path
 import json 
 import asyncio
 import os
 
+# Add backend to path so we can import internal models cleanly
+backend_path = Path(__file__).parent / "backend"
+if str(backend_path) not in sys.path:
+    sys.path.insert(0, str(backend_path))
+
+from models.schemas import ProductData, UserData
+from core.agent import execute_agent
 
 def build_product_data(extracted):
     title = "Unknown product"
 
-    if extracted["items"]:
+    if extracted.get("items"):
         title = extracted["items"][0]["name"]
 
     return ProductData(
@@ -21,7 +26,7 @@ def build_product_data(extracted):
     ) 
 
 def load_user():
-    user_file = Path(__file__).parent / "Orion" / "backend" / "data" / "users" / "mock_users.json"
+    user_file = Path(__file__).parent / "backend" / "data" / "users" / "mock_users.json"
     if not user_file.exists():
         create_mock_user_data(user_file)
     with open(user_file) as f:
@@ -35,17 +40,16 @@ def create_mock_user_data(file_path):
     mock_users = [
         {
             "user_id": "demo_user_001",
-            "name": "Demo User",
-            "monthly_income": 3000,
-            "transactions": [
-                {"date": "2026-02-01", "amount": 45.00, "category": "groceries"},
-                {"date": "2026-02-02", "amount": 20.00, "category": "dining"},
-                {"date": "2026-02-05", "amount": 80.00, "category": "electronics"},
-            ],
-            "savings_goals": {"emergency_fund": 5000, "vacation": 2000},
-            "current_savings": 2500,
+            "monthly_income": 3000.0,
+            "current_balance": 2500.0,
+            "pay_cycle": "monthly",
             "days_until_payday": 8,
-            "budget_limits": {"groceries": 300, "dining": 150, "electronics": 200}
+            "savings_goals": [{"name": "vacation", "current_amount": 500.0, "target_amount": 2000.0}],
+            "debts": [],
+            "transactions": [
+                {"id": "t1", "date": "2026-02-01", "amount": 45.00, "merchant": "groceries", "category": "groceries"}
+            ],
+            # Pass whatever else without crashing
         }
     ]
     with open(file_path, "w") as f:
@@ -62,9 +66,9 @@ async def get_agent_recommendations(extracted_data):
         result = await execute_agent(user, product)
         
         return {
-            "agent_analysis": result,
-            "should_buy": result.get("is_recommended", False),
-            "reasoning": result.get("explanation", "")
+            "agent_analysis": result.model_dump(),
+            "should_buy": result.verdict == "BUY",
+            "reasoning": result.reasoning
         }
     except Exception as e:
         print(f"Agent analysis error: {e}")

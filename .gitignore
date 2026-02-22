@@ -19,3 +19,6 @@ __pycache__/
 *.db
 .agents
 demo_ui.html
+expenses.json
+fake_receipt.png
+test_product.jpg
