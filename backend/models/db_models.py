@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from core.database import Base
@@ -39,6 +40,12 @@ class WebhookEvent(Base):
     )
 
 
+=======
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime
+from core.database import Base
+from datetime import datetime, timezone
+
+>>>>>>> origin/feature/reasoningLLM
 class Transaction(Base):
     __tablename__ = "transactions"
 
