@@ -4,3 +4,5 @@ pydantic
 openai
 stripe
 python-dotenv
+sqlalchemy
+aiosqlite

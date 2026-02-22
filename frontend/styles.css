@@ -429,6 +429,13 @@ input[type="number"] {
     }
 }
 
+.removing {
+    transform: scale(0.9) !important;
+    opacity: 0 !important;
+    pointer-events: none;
+    transition: all 0.3s ease !important;
+}
+
 .transaction-list li:hover,
 .bank-list li:hover {
     background: rgba(255, 255, 255, 0.08);
@@ -551,7 +558,7 @@ input[type="number"] {
     .card {
         padding: 15px 25px;
         justify-content: center;
-        min-width: 160px;
+        min-width: 200px;
     }
 
     .card .amount {

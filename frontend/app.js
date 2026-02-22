@@ -1,3 +1,4 @@
+console.log("Orion App loaded at " + new Date().toLocaleTimeString());
 const balance = document.getElementById('balance');
 const incomeDisplay = document.getElementById('income');
 const expenseDisplay = document.getElementById('expense');
@@ -9,36 +10,122 @@ const bankName = document.getElementById('bank-name');
 const bankBalance = document.getElementById('bank-balance');
 const historyTitle = document.getElementById('history-title');
 
+const API_BASE = "http://localhost:8000/api/v1";
 const localStorageBanks = JSON.parse(localStorage.getItem('banks'));
-let banks = localStorage.getItem('banks') !== null ? localStorageBanks : [];
+let banks = []; // We will populate this from the DB
 
 let activeBankId = null;
 
-function init() {
-    bankList.innerHTML = '';
-    banks.forEach(addBankDOM);
-    updateValues();
-    updateHistoryDOM();
+async function init() {
+    try {
+        const response = await fetch(`${API_BASE}/all-data`);
+        const data = await response.json();
+
+        // Flatten accounts from all users into the dashboard 'banks' list
+        banks = [];
+        data.users.forEach(user => {
+            user.accounts.forEach(acc => {
+                banks.push({
+                    id: acc.id,
+                    name: `${user.name}'s ${acc.type}`,
+                    balance: acc.balance,
+                    transactions: acc.transactions // Store transactions for filtering
+                });
+            });
+        });
+
+        bankList.innerHTML = '';
+        banks.forEach(addBankDOM);
+        updateValues();
+        updateHistoryDOM();
+    } catch (error) {
+        console.error("Failed to sync with DB:", error);
+        // Fallback to local storage if DB is down
+        banks = localStorageBanks || [];
+        bankList.innerHTML = '';
+        banks.forEach(addBankDOM);
+        updateValues();
+    }
 }
 
-function addBank(e) {
+async function addBank(e) {
+    console.log("Adding bank account...");
     e.preventDefault();
 
     if (bankName.value.trim() === '' || bankBalance.value.trim() === '') {
         alert('Please add a bank name and balance');
-    } else {
-        const bank = {
-            id: generateID(),
-            name: bankName.value,
-            balance: +bankBalance.value
+        return;
+    }
+
+    const payload = {
+        user_id: 1, // Defaulting to John Doe for the demo
+        account_type: bankName.value,
+        balance: +bankBalance.value
+    };
+
+    try {
+        const response = await fetch(`${API_BASE}/bank-accounts`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error('Failed to create bank account');
+
+        const data = await response.json();
+
+        // Clear inputs
+        const nameVal = bankName.value;
+        const balanceVal = +bankBalance.value;
+        bankName.value = '';
+        bankBalance.value = '';
+
+        // Update local state immediately instead of waiting for full init() re-fetch
+        const newBank = {
+            id: data.account_id,
+            name: `John Doe's ${nameVal}`,
+            balance: balanceVal,
+            transactions: [{
+                merchant: "Account Opening",
+                amount: balanceVal,
+                category: "Initial Deposit",
+                timestamp: new Date().toISOString(),
+                type: "CREDIT"
+            }]
         };
 
-        banks.push(bank);
+        banks.push(newBank);
 
-        addBankDOM(bank);
+        // Instant update without clearing everything
+        addBankDOM(newBank);
+        selectBank(data.account_id); // This handles setting active class and updating history
         updateValues();
         updateLocalStorage();
 
+    } catch (error) {
+        console.error("Error adding bank:", error);
+        alert("Failed to sync with backend. Check if the server is running.");
+
+        // Fallback for demo if backend is truly unreachable and user wants local-only
+        const bank = {
+            id: generateID(),
+            name: bankName.value,
+            balance: +bankBalance.value,
+            transactions: [{
+                id: generateID(),
+                merchant: "Initial Deposit (Local Only)",
+                amount: +bankBalance.value,
+                category: "Opening Balance",
+                timestamp: new Date().toISOString(),
+                type: "CREDIT"
+            }]
+        };
+        banks.push(bank);
+        addBankDOM(bank);
+        updateValues();
+        updateLocalStorage();
         bankName.value = '';
         bankBalance.value = '';
     }
@@ -88,7 +175,7 @@ function addBankDOM(bank) {
             <span class="transaction-text">${bank.name}</span> 
             <span>${sign}$${Math.abs(bank.balance).toFixed(2)}</span>
         </div>
-        <button class="delete-btn" onclick="removeBank(event, ${bank.id})">✖</button>
+        <button class="delete-btn" onclick="removeBank(event, ${bank.id}); return false;">✖</button>
     `;
 
     item.onclick = () => selectBank(bank.id);
@@ -99,29 +186,105 @@ function addBankDOM(bank) {
 function updateHistoryDOM() {
     list.innerHTML = '';
 
-    const item = document.createElement('li');
-    item.style.justifyContent = 'center';
-    item.style.background = 'transparent';
-    item.style.border = 'none';
-    item.style.boxShadow = 'none';
-
-    if (activeBankId !== null) {
-        item.innerHTML = `<span class="transaction-text" style="color: var(--text-secondary); font-style: italic;">No transactions yet...</span>`;
-    } else {
+    if (activeBankId === null) {
+        const item = document.createElement('li');
+        item.style.justifyContent = 'center';
+        item.style.background = 'transparent';
+        item.style.border = 'none';
+        item.style.boxShadow = 'none';
         item.innerHTML = `<span class="transaction-text" style="color: var(--text-secondary); font-style: italic;">Select a bank account.</span>`;
+        list.appendChild(item);
+        return;
     }
-    list.appendChild(item);
+
+    const bank = banks.find(b => b.id === activeBankId);
+    if (!bank || !bank.transactions || bank.transactions.length === 0) {
+        const item = document.createElement('li');
+        item.style.justifyContent = 'center';
+        item.style.background = 'transparent';
+        item.style.border = 'none';
+        item.style.boxShadow = 'none';
+        item.innerHTML = `<span class="transaction-text" style="color: var(--text-secondary); font-style: italic;">No transactions yet...</span>`;
+        list.appendChild(item);
+        return;
+    }
+
+    bank.transactions.forEach(tx => {
+        const item = document.createElement('li');
+        const isCredit = tx.type === 'CREDIT';
+        item.classList.add(isCredit ? 'plus' : 'minus');
+
+        item.innerHTML = `
+            <div class="transaction-info">
+                <div>
+                    <span class="transaction-text" style="display: block;">${tx.merchant}</span>
+                    <small style="color: var(--text-secondary); font-size: 0.75rem;">${tx.category} • ${new Date(tx.timestamp).toLocaleDateString()}</small>
+                </div>
+                <span class="font-bold">${isCredit ? '+' : '-'}$${tx.amount.toFixed(2)}</span>
+            </div>
+        `;
+        list.appendChild(item);
+    });
 }
 
-function removeBank(e, id) {
+async function removeBank(e, id) {
+    console.log("Removing bank account ID: " + id);
     e.stopPropagation();
+
+    // Find the element for a smooth animation
+    const li = e.target.closest('li');
+    if (li) {
+        li.classList.add('removing');
+    }
+
+    // Save original state for revert if needed
+    const originalBanks = [...banks];
+    const originalActiveId = activeBankId;
+
+    // 1. Update state immediately (Optimistic UI)
     banks = banks.filter(bank => bank.id !== id);
     if (activeBankId === id) {
         activeBankId = null;
         historyTitle.innerText = 'History';
     }
+
+    // 2. Refresh UI immediately (No lag!)
+    updateValues();
+    updateHistoryDOM();
     updateLocalStorage();
-    init();
+
+    // Just remove the one item from the DOM smoothly
+    setTimeout(() => {
+        if (li) li.remove();
+
+        // If we removed the active bank, we need to show the "select an account" message in history
+        if (originalActiveId === id) {
+            updateHistoryDOM();
+        }
+    }, 150);
+
+    // 3. Sync with background in the background
+    try {
+        const response = await fetch(`${API_BASE}/bank-accounts/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            throw new Error('Server rejected deletion');
+        }
+
+    } catch (error) {
+        console.error("Error deleting bank:", error);
+        alert("Failed to delete account from server. Reverting...");
+
+        // REVERT if server failed
+        banks = originalBanks;
+        activeBankId = originalActiveId;
+        bankList.innerHTML = '';
+        banks.forEach(addBankDOM);
+        updateValues();
+        updateHistoryDOM();
+    }
 }
 
 function updateValues() {
