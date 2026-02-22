@@ -80,8 +80,10 @@ async def _handle_checkout_completed(session_obj: dict, db: AsyncSession) -> Non
             ent.pro_subscription_id = subscription_id
         logger.info("Activated Pro for user %s (sub: %s)", user_id, subscription_id)
 
-    else:
-        logger.warning("Unknown purchase_type '%s' for user %s", purchase_type, user_id)
+    elif purchase_type == "recommended":
+        # For recommended product purchases, we simply record the purchase.
+        # Future implementation could grant product-specific benefits.
+        logger.info("Recommended product purchased for user %s (product_id=%s)", user_id, metadata.get("product_id"))
 
 
 async def _handle_invoice_paid(invoice_obj: dict, db: AsyncSession) -> None:

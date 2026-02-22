@@ -189,3 +189,72 @@ async def delete_bank_account(account_id: int, db: AsyncSession = Depends(get_db
     await db.commit()
     
     return {"status": "success", "message": "Account deleted"}
+
+@router.get("/user-profile/{user_id}", response_model=UserData)
+async def get_user_profile(user_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Returns a structured UserData profile for the agent, 
+    syncing live balance and profile data from the database.
+    """
+    # Fetch user with accounts
+    result = await db.execute(
+        select(User).where(User.id == user_id).options(selectinload(User.accounts))
+    )
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        # Create a default user if none exists (demo simplicity)
+        user = User(
+            id=user_id,
+            name="Demo User",
+            email="demo@orion.ai",
+            monthly_income=5000.0,
+            pay_cycle="monthly",
+            days_until_payday=15,
+            savings_goals=[{"name": "Emergency Fund", "current_amount": 1000, "target_amount": 10000}]
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    total_balance = sum(acc.balance for acc in user.accounts)
+    
+    return UserData(
+        user_id=str(user.id),
+        monthly_income=user.monthly_income,
+        current_balance=total_balance,
+        pay_cycle=user.pay_cycle,
+        days_until_payday=user.days_until_payday,
+        savings_goals=user.savings_goals,
+        debts=user.debts,
+        transactions=[]
+    )
+
+class UserProfileUpdate(BaseModel):
+    monthly_income: Optional[float] = None
+    pay_cycle: Optional[str] = None
+    days_until_payday: Optional[int] = None
+    savings_goals: Optional[List[Dict[str, Any]]] = None
+    debts: Optional[List[Dict[str, Any]]] = None
+
+@router.post("/user-profile/{user_id}/update")
+async def update_user_profile(user_id: int, profile: UserProfileUpdate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if profile.monthly_income is not None:
+        user.monthly_income = profile.monthly_income
+    if profile.pay_cycle is not None:
+        user.pay_cycle = profile.pay_cycle
+    if profile.days_until_payday is not None:
+        user.days_until_payday = profile.days_until_payday
+    if profile.savings_goals is not None:
+        user.savings_goals = profile.savings_goals
+    if profile.debts is not None:
+        user.debts = profile.debts
+        
+    await db.commit()
+    return {"status": "success"}

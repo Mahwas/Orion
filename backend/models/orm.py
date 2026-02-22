@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, JSON
 from sqlalchemy.orm import relationship
 from database import Base
 import datetime
@@ -8,6 +8,13 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String)
     email = Column(String, unique=True, index=True)
+    
+    # Financial Profile
+    monthly_income = Column(Float, default=0.0)
+    pay_cycle = Column(String, default="monthly")
+    days_until_payday = Column(Integer, default=0)
+    savings_goals = Column(JSON, default=list) # List of dicts
+    debts = Column(JSON, default=list) # List of dicts
     
     accounts = relationship("BankAccount", back_populates="owner")
 

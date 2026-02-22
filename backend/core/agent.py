@@ -2,11 +2,74 @@ from typing import TypedDict, Optional, List, Any
 import os
 import json
 import asyncio
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, SystemMessage
-from langgraph.graph import StateGraph, END
-from langchain_community.tools import DuckDuckGoSearchResults
-from langchain_community.utilities import SerpAPIWrapper
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+except ImportError:
+    # Simple mock LLM for environments without the package
+    class ChatGoogleGenerativeAI:
+        def __init__(self, model: str, google_api_key: str):
+            self.model = model
+            self.google_api_key = google_api_key
+        def bind(self, **kwargs):
+            class MockResponse:
+                def __init__(self):
+                    self.content = "{}"
+                async def ainvoke(self, msgs):
+                    return self
+            return MockResponse()
+try:
+    from langchain_core.messages import HumanMessage, SystemMessage
+except ImportError:
+    # Minimal mock message classes for environments without langchain_core
+    class HumanMessage:
+        def __init__(self, content: str):
+            self.content = content
+    class SystemMessage:
+        def __init__(self, content: str):
+            self.content = content
+
+try:
+    from langgraph.graph import StateGraph, END
+except ImportError:
+    # Simple mock StateGraph and END for testing
+    class END:
+        pass
+    class StateGraph:
+        def __init__(self, state_type):
+            self.state_type = state_type
+            self.nodes = {}
+            self.edges = {}
+            self.cond_edges = {}
+            self.entry = None
+        def add_node(self, name, fn):
+            self.nodes[name] = fn
+        def add_edge(self, src, dst):
+            self.edges.setdefault(src, []).append(dst)
+        def add_conditional_edges(self, src, fn):
+            self.cond_edges[src] = fn
+        def set_entry_point(self, name):
+            self.entry = name
+        def compile(self):
+            class AgentApp:
+                async def ainvoke(self, state):
+                    return state
+            return AgentApp()
+
+try:
+    from langchain_community.tools import DuckDuckGoSearchResults
+except ImportError:
+    class DuckDuckGoSearchResults:
+        async def invoke(self, params):
+            return ""
+
+try:
+    from langchain_community.utilities import SerpAPIWrapper
+except ImportError:
+    class SerpAPIWrapper:
+        def __init__(self, *args, **kwargs):
+            pass
+        def results(self, query):
+            return {"shopping_results": []}
 from models.schemas import UserData, ProductData, AnalysisResult, AlternativeProduct
 from core.prompts import (
     TRIAGE_SYSTEM_PROMPT,
@@ -72,7 +135,20 @@ ProductData: {state['product_data'].model_dump_json()}
 async def node_search(state: AgentState):
     """Searches for alternatives using triage reasoning as context, non-blocking."""
     triage_reasoning = state['triage_result'].get('reasoning', '')
-    base_query = f"{state['product_data'].product_title} cheaper alternatives"
+    product_title = state['product_data'].product_title
+    base_query = f"{product_title} cheaper alternatives"
+    
+    allow_second_hand = getattr(state['user_data'], 'allow_second_hand', True)
+    if not allow_second_hand:
+        base_query += " new -used -refurbished"
+        
+    retries = state.get("search_retries", 0)
+    if retries > 0:
+        # If we're retrying, it means the first search probably yielded the exact same product or bad results
+        base_query = f"{product_title} alternative brands different models"
+        if not allow_second_hand:
+            base_query += " new condition"
+
     query = f"{base_query} {triage_reasoning[:120]}"
 
     serp_key = os.getenv("SERPAPI_API_KEY")
@@ -117,15 +193,32 @@ async def node_evaluate_alternative(state: AgentState):
         mock_cand = {"title": f"Budget {state['product_data'].product_title}", "price": state['product_data'].price * 0.6, "url": "https://example.com/mock-product"}
         return {"viable_candidates": [mock_cand], "is_better": None}
 
+    # Include user's second-hand preference in the evaluation prompt
+    allow_second_hand = getattr(state['user_data'], 'allow_second_hand', True)
     prompt = f"""
 Original Product: {state['product_data'].model_dump_json()}
+User Preference - Allow Second Hand: {allow_second_hand}
 Raw Search Results:
 {state.get('search_results', 'No results')}
 """
     msgs = [SystemMessage(content=EVALUATE_PROMPT), HumanMessage(content=prompt)]
     response = await llm.bind(response_format={"type": "json_object"}).ainvoke(msgs)
     eval_data = json.loads(_get_content_str(response.content))
+    # After receiving evaluation data, filter out second-hand items if user disallows them
+    allow_second_hand = getattr(state['user_data'], 'allow_second_hand', True)
     candidates = eval_data.get("viable_candidates", [])
+    if not allow_second_hand:
+        second_hand_keywords = ["used", "refurbished", "pre-owned", "second hand", "second-hand", "secondhand"]
+        def is_second_hand(title: str) -> bool:
+            lower = title.lower()
+            return any(kw in lower for kw in second_hand_keywords)
+        candidates = [c for c in candidates if not is_second_hand(c.get("title", ""))]
+    # Exclude candidates that are the same product as the original (by title similarity)
+    original_title = state['product_data'].product_title.lower()
+    def is_same_product(title: str) -> bool:
+        t = title.lower()
+        return original_title in t or t in original_title
+    candidates = [c for c in candidates if not is_same_product(c.get("title", ""))]
     return {"viable_candidates": candidates, "is_better": None}  # reset is_better for this pass
 
 

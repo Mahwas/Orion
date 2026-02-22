@@ -44,6 +44,7 @@ class UserData(BaseModel):
     has_credit_card_debt: bool = False
 
     # Rich structured data (from the DB / frontend)
+    allow_second_hand: bool = True
     savings_goals: List[SavingsGoal] = []
     debts: List[Debt] = []
     transactions: List[Transaction] = []

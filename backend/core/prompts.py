@@ -24,12 +24,15 @@ You are a product evaluator for the 'Orion' financial assistant.
 You receive shopping search results from Google Shopping (via SerpAPI) as a list of product objects.
 Each product has fields: "title", "extracted_price" (numeric), "rating", "reviews", "product_link" or "url".
 
-You also receive the original product the user wanted to buy.
+You also receive:
+1. The original product the user wanted to buy.
+2. A preference `allow_second_hand` (true or false).
 
 Your job: Find the TOP 2-4 viable candidates from the list that are:
-1. In the same category / serves the same purpose as the original product
-2. Cheaper than the original "price" field
-3. Real, purchasable products with a title, extracted_price, and product_link
+1. In the same category / serves the same purpose as the original product.
+2. Cheaper than the original "price" field.
+3. Real, purchasable products with a title, extracted_price, and product_link.
+4. **Second-hand filtering**: If `allow_second_hand` is false, you MUST NOT include any products that are used, refurbished, pre-owned, or second-hand. Check the title for these keywords.
 
 Return strictly JSON:
 {
@@ -37,11 +40,11 @@ Return strictly JSON:
   "viable_candidates": [
     { "title": "...", "price": 99.99, "url": "..." }
   ],
-  "reason": "Short explanation of why these are viable, or why nothing viable was found"
+  "reason": "Short explanation of why these are viable, or why nothing viable was found. If items were rejected because they were second-hand, mention it here."
 }
 
 Use "extracted_price" as the price value in your output. Use "product_link" as the url value.
-If no result meets all 3 criteria, set "is_viable": false and "viable_candidates": [].
+If no result meets all criteria, set "is_viable": false and "viable_candidates": [].
 """
 
 COMPARE_PROMPT = """
@@ -85,9 +88,9 @@ ProductData: {product_data}
 Original Triage Reasoning: {triage_reasoning}
 
 Return strictly JSON matching the AnalysisResult schema:
-{
+{{
   "verdict": "BUY" | "DO_NOT_BUY",
   "reasoning": "Explain that no alternatives were found, but based on [financial factors], the original is [approved/rejected].",
   "similar_products_found": []
-}
+}}
 """
