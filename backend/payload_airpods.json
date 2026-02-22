@@ -1,0 +1,33 @@
+{
+    "user_data": {
+        "user_id": "u125",
+        "monthly_income": 8000.0,
+        "current_balance": 12400.0,
+        "pay_cycle": "bi-weekly",
+        "days_until_payday": 20,
+        "savings_goals": [
+            {
+                "name": "House Down Payment",
+                "current_amount": 45000.0,
+                "target_amount": 100000.0
+            }
+        ],
+        "debts": [],
+        "transactions": [
+            {
+                "id": "t6",
+                "date": "2026-02-19",
+                "merchant": "Nordstrom",
+                "amount": 450.00,
+                "category": "Shopping",
+                "is_recurring": false
+            }
+        ]
+    },
+    "product_data": {
+        "product_title": "Apple AirPods Max",
+        "price": 549.00,
+        "category": "Electronics",
+        "description": "Over-ear wireless headphones with active noise cancellation."
+    }
+}

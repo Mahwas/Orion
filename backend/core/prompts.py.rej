@@ -1,0 +1,8 @@
+@@ -74,6 +74,6 @@
+ Output JSON MUST contain:
+ - "verdict": "BUY", "ALTERNATIVE_RECOMMENDED", or "DO_NOT_BUY"
+ - "reasoning": "Clear explanation citing the user's deep financial state."
+-- "similar_products_found": [ {"title": "...", "price": ...} ] (Populate this if you suggest an alternative, otherwise empty list).
++- "similar_products_found": [ {"title": "...", "price": ..., "url": "..."} ] (Populate this if you suggest an alternative, otherwise empty list. MUST INCLUDE URL IF AVAILABLE).
+ """
+ 

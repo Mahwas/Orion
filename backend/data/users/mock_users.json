@@ -1,0 +1,147 @@
+[
+    {
+        "user_id": "u123",
+        "monthly_income": 4500.0,
+        "current_balance": 1850.25,
+        "pay_cycle": "bi-weekly",
+        "days_until_payday": 14,
+        "savings_goals": [
+            {
+                "name": "Emergency Fund",
+                "current_amount": 1000.0,
+                "target_amount": 10000.0
+            }
+        ],
+        "debts": [
+            {
+                "type": "Credit Card",
+                "balance": 1200.0,
+                "apr": 24.99
+            }
+        ],
+        "transactions": [
+            {
+                "id": "t1",
+                "date": "2026-02-15",
+                "merchant": "Netflix",
+                "amount": 15.99,
+                "category": "Subscriptions",
+                "is_recurring": true
+            },
+            {
+                "id": "t2",
+                "date": "2026-02-18",
+                "merchant": "Best Buy",
+                "amount": 150.00,
+                "category": "Electronics",
+                "is_recurring": false
+            },
+            {
+                "id": "t3",
+                "date": "2026-02-20",
+                "merchant": "Uber Eats",
+                "amount": 35.50,
+                "category": "Dining",
+                "is_recurring": false
+            }
+        ]
+    },
+    {
+        "user_id": "u124",
+        "monthly_income": 3200.0,
+        "current_balance": 450.0,
+        "pay_cycle": "monthly",
+        "days_until_payday": 3,
+        "savings_goals": [
+            {
+                "name": "Car Deposit",
+                "current_amount": 1500.0,
+                "target_amount": 5000.0
+            }
+        ],
+        "debts": [],
+        "transactions": [
+            {
+                "id": "t4",
+                "date": "2026-02-01",
+                "merchant": "Rent",
+                "amount": 1000.00,
+                "category": "Housing",
+                "is_recurring": true
+            },
+            {
+                "id": "t5",
+                "date": "2026-02-10",
+                "merchant": "Trader Joe's",
+                "amount": 85.00,
+                "category": "Groceries",
+                "is_recurring": false
+            }
+        ]
+    },
+    {
+        "user_id": "u125",
+        "monthly_income": 8000.0,
+        "current_balance": 12400.0,
+        "pay_cycle": "bi-weekly",
+        "days_until_payday": 20,
+        "savings_goals": [
+            {
+                "name": "House Down Payment",
+                "current_amount": 45000.0,
+                "target_amount": 100000.0
+            }
+        ],
+        "debts": [],
+        "transactions": [
+            {
+                "id": "t6",
+                "date": "2026-02-19",
+                "merchant": "Nordstrom",
+                "amount": 450.00,
+                "category": "Shopping",
+                "is_recurring": false
+            },
+            {
+                "id": "t7",
+                "date": "2026-02-20",
+                "merchant": "Whole Foods",
+                "amount": 120.00,
+                "category": "Groceries",
+                "is_recurring": false
+            }
+        ]
+    },
+    {
+        "user_id": "u126",
+        "monthly_income": 6000.0,
+        "current_balance": 2500.0,
+        "pay_cycle": "monthly",
+        "days_until_payday": 10,
+        "buying_behavior": "Value shopper, looks for deals, reads reviews",
+        "discretionary_budget": 800.0,
+        "monthly_fixed_costs": 2000.0,
+        "upcoming_bills_total": 500.0,
+        "monthly_savings_goal": 1000.0,
+        "recent_large_purchases": [],
+        "has_credit_card_debt": false,
+        "savings_goals": [
+            {
+                "name": "Vacation Fund",
+                "current_amount": 1500.0,
+                "target_amount": 3000.0
+            }
+        ],
+        "debts": [],
+        "transactions": [
+            {
+                "id": "t8",
+                "date": "2026-02-18",
+                "merchant": "Amazon",
+                "amount": 45.00,
+                "category": "Shopping",
+                "is_recurring": false
+            }
+        ]
+    }
+]

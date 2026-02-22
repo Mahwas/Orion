@@ -15,9 +15,13 @@ __pycache__/
 .idea/
 *.swp
 *.swo
-
-# Database
+.env
 *.db
+.agents
+demo_ui.html
+expenses.json
+fake_receipt.png
+test_product.jpg
 *.db-journal
 *.db-shm
 *.db-wal

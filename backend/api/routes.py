@@ -1,14 +1,21 @@
-from fastapi import APIRouter, Depends
-from models import PurchaseContext, DecisionOutput, FeedbackEvent, FinancialSnapshot, BudgetMemoryPreferences, BudgetMemoryLearningWeights, BudgetMemory
-from typing import Dict, Any, List
-from core.agent import evaluate_purchase
-from services.stripe_service import create_checkout
+from fastapi import APIRouter, Depends, HTTPException
+from typing import Dict, Any, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from pydantic import BaseModel
+
+# Imports from HEAD (database branch)
+from models import PurchaseContext, DecisionOutput, FeedbackEvent, FinancialSnapshot, BudgetMemoryPreferences, BudgetMemoryLearningWeights, BudgetMemory
+from core.agent import evaluate_purchase
+from services.stripe_service import create_checkout
 from database import get_db
 from models.orm import User, BankAccount, Transaction
-from pydantic import BaseModel
+
+# Imports from feature branch
+from models.schemas import UserData, ProductData, AnalysisResult
+from models.db_models import StripeTransaction, StripeUser, Entitlement
+from core.agent import execute_agent
 
 router = APIRouter()
 
@@ -17,8 +24,61 @@ class BankAccountCreate(BaseModel):
     account_type: str
     balance: float
 
+class AnalyzeRequest(BaseModel):
+    user_data: UserData
+    product_data: ProductData
+
 # Global state to act as a buffer for the demo
 latest_decision = None
+
+@router.post("/analyze", response_model=AnalysisResult)
+async def analyze_purchase(payload: AnalyzeRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Kicks off the LangGraph agent to evaluate a purchase.
+    Requires user to have an active Pro subscription OR at least 1 credit.
+    """
+    user_id = payload.user_data.user_id
+    # Note: Using StripeUser from db_models since this logic expects that schema
+    result = await db.execute(select(StripeUser).where(StripeUser.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    result = await db.execute(select(Entitlement).where(Entitlement.user_id == user_id))
+    ent = result.scalar_one_or_none()
+
+    # --- Entitlement check ---
+    if ent and ent.pro_active:
+        # Pro subscribers get unlimited analyses
+        pass
+    elif ent and ent.credits_balance > 0:
+        # Deduct 1 credit
+        ent.credits_balance -= 1
+        # No await needed for simple attribute change, but we need to commit
+        await db.commit()
+    else:
+        raise HTTPException(
+            status_code=402,
+            detail="No analysis credits remaining. "
+                   "Buy a credits pack or upgrade to Orion Pro.",
+        )
+
+    result = await execute_agent(payload.user_data, payload.product_data)
+    return result
+
+@router.get("/transactions/{user_id}")
+async def get_user_transactions(user_id: str, db: AsyncSession = Depends(get_db)):
+    """
+    Fetches the transaction history for a given user.
+    """
+    result = await db.execute(
+        select(StripeTransaction)
+        .where(StripeTransaction.user_id == user_id)
+        .order_by(StripeTransaction.timestamp.desc())
+    )
+    transactions = result.scalars().all()
+    return transactions
 
 @router.post("/context", response_model=Dict[str, Any])
 async def ingest_context(context: PurchaseContext):
