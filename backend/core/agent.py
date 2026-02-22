@@ -76,28 +76,38 @@ from core.prompts import (
     EVALUATE_PROMPT,
     COMPARE_PROMPT,
     SYNTHESIS_SYSTEM_PROMPT,
+    VOICE_SYSTEM_PROMPT,
     FINAL_DECISION_NO_ALT_PROMPT,
 )
+from langgraph.checkpoint.memory import MemorySaver
+import mss
+import numpy as np
+import cv2
+import base64
+from datetime import datetime
+from pathlib import Path
 
 MAX_SEARCH_RETRIES = 2
 MAX_SYNTHESIS_RETRIES = 2
 
 # --- State Definition ---
 class AgentState(TypedDict):
+    messages: List[Any]          # Chat history
     user_data: UserData
-    product_data: ProductData
+    product_data: Optional[ProductData]
     triage_result: Optional[dict]
     search_results: Optional[str]
-    viable_candidates: List[dict]        # Top picks from evaluate node
-    is_better: Optional[bool]            # Result of compare node
-    selected_alternative: Optional[dict] # Final chosen alternative
-    search_retries: int                  # Tracks search loop count
+    viable_candidates: List[dict]
+    is_better: Optional[bool]
+    selected_alternative: Optional[dict]
+    search_retries: int
     final_decision: Optional[AnalysisResult]
     synthesis_retries: int
     synthesis_error: Optional[str]
+    screen_analysis: Optional[str]
 
 # --- Initialize LLM & Tools ---
-llm = ChatGoogleGenerativeAI(model="gemini-flash-latest", google_api_key=os.getenv("GOOGLE_API_KEY", "mock_key"))
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=os.getenv("GOOGLE_API_KEY", "mock_key"))
 search_tool = DuckDuckGoSearchResults()
 
 def _get_content_str(content: Any) -> str:
@@ -367,10 +377,103 @@ def route_after_synthesize(state: AgentState) -> str:
     return "node_synthesize"
 
 
+# --- New Nodes for Voice/Conversational Flow ---
+
+async def capture_screen():
+    """Captures the primary screen and returns the path to the saved image."""
+    screenshots_dir = Path("screenshots")
+    screenshots_dir.mkdir(exist_ok=True)
+    
+    with mss.mss() as sct:
+        monitor = sct.monitors[1]
+        screenshot = sct.grab(monitor)
+        img = np.array(screenshot)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = screenshots_dir / f"agent_screen_{timestamp}.png"
+        cv2.imwrite(str(filename), img)
+        return str(filename)
+
+async def extract_product_from_image(image_path: str) -> Optional[ProductData]:
+    """Uses Gemini Vision to extract product details from a screenshot."""
+    if not os.path.exists(image_path):
+        return None
+
+    with open(image_path, "rb") as f:
+        image_data = base64.b64encode(f.read()).decode("utf-8")
+
+    prompt = """
+    Analyze this screenshot. If you see a product being viewed (e.g. on Amazon, any store, or search results), extract:
+    1. Product Title
+    2. Price (just the number)
+    3. Category
+    
+    Return strictly JSON:
+    {
+      "product_title": "...",
+      "price": 99.99,
+      "category": "..."
+    }
+    If no product is found, return null.
+    """
+    
+    message = HumanMessage(
+        content=[
+            {"type": "text", "text": prompt},
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{image_data}"},
+            },
+        ]
+    )
+    
+    try:
+        response = await llm.bind(response_format={"type": "json_object"}).ainvoke([message])
+        content = _get_content_str(response.content)
+        data = json.loads(content)
+        if data:
+            return ProductData(**data)
+    except Exception as e:
+        print(f"Vision extraction failed: {e}")
+    
+    return None
+
+async def node_voice_chat(state: AgentState):
+    """Handles conversational voice queries using memory and optionally screen capture."""
+    last_message = state['messages'][-1].content.lower()
+    
+    screen_info = ""
+    if "looking at" in last_message or "on my screen" in last_message or "this" in last_message:
+        path = await capture_screen()
+        # In a real scenario, we'd send this to Gemini Vision. 
+        # For now, we'll use a placeholder or trigger the existing reasoning logic.
+        screen_info = f"\n[Agent took a screenshot: {path}]"
+    
+    prompt = f"""
+User Profile: {state['user_data'].model_dump_json()}
+Recent Transactions: {json.dumps([tx.model_dump() for tx in state['user_data'].transactions[:5]])}
+{screen_info}
+"""
+    msgs = [SystemMessage(content=VOICE_SYSTEM_PROMPT), *state['messages']]
+    # We append the financial context to the human message or as a system message
+    msgs.insert(-1, SystemMessage(content=prompt))
+    
+    response = await llm.ainvoke(msgs)
+    
+    return {
+        "messages": [response],
+        "final_decision": AnalysisResult(
+            verdict="CONVERSATIONAL",
+            reasoning=_get_content_str(response.content),
+            similar_products_found=[]
+        )
+    }
+
 # =============================================================================
 # GRAPH ASSEMBLY
 # =============================================================================
 
+memory = MemorySaver()
 workflow = StateGraph(AgentState)
 
 workflow.add_node("node_triage", node_triage)
@@ -382,8 +485,21 @@ workflow.add_node("fast_reject", node_fast_reject)
 workflow.add_node("fast_approve", node_fast_approve)
 workflow.add_node("node_no_alternative_found", node_no_alternative_found)
 workflow.add_node("synthesis_fallback", node_synthesis_fallback)
+workflow.add_node("node_voice_chat", node_voice_chat)
 
-workflow.set_entry_point("node_triage")
+def route_start(state: AgentState):
+    # If it's a product analysis request (has product_data), go to triage
+    if state.get("product_data"):
+        return "node_triage"
+    return "node_voice_chat"
+
+workflow.set_conditional_entry_point(
+    route_start,
+    {
+        "node_triage": "node_triage",
+        "node_voice_chat": "node_voice_chat"
+    }
+)
 
 workflow.add_conditional_edges("node_triage", route_after_triage)
 workflow.add_edge("node_search", "node_evaluate_alternative")
@@ -394,17 +510,19 @@ workflow.add_edge("fast_reject", END)
 workflow.add_edge("fast_approve", END)
 workflow.add_edge("node_no_alternative_found", END)
 workflow.add_edge("synthesis_fallback", END)
+workflow.add_edge("node_voice_chat", END)
 
-# Compile Graph
-agent_app = workflow.compile()
+# Compile Graph with memory
+agent_app = workflow.compile(checkpointer=memory)
 
 
 # =============================================================================
 # ENTRYPOINT
 # =============================================================================
 
-async def execute_agent(user: UserData, product: ProductData) -> AnalysisResult:
+async def execute_agent(user: UserData, product: Optional[ProductData] = None, messages: List[Any] = None, thread_id: str = "default") -> AnalysisResult:
     initial_state = {
+        "messages": messages or [],
         "user_data": user,
         "product_data": product,
         "triage_result": None,
@@ -417,5 +535,13 @@ async def execute_agent(user: UserData, product: ProductData) -> AnalysisResult:
         "synthesis_error": None,
     }
 
-    final_state = await agent_app.ainvoke(initial_state)
+    config = {"configurable": {"thread_id": thread_id}}
+    
+    # If messages are provided but no product, we likely want voice_chat
+    if messages and not product:
+        # We need to manually route for now or update set_entry_point
+        # Let's update the entry point to a router node.
+        pass
+
+    final_state = await agent_app.ainvoke(initial_state, config=config)
     return final_state["final_decision"]

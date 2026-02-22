@@ -38,6 +38,7 @@
                 <li><a href="#" data-page="accounts">Accounts</a></li>
                 <li><a href="#" data-page="transactions">Transactions</a></li>
                 <li><a href="#" data-page="analytics">Analytics</a></li>
+                <li><a href="#" data-page="voice">Voice Assistant</a></li>
                 <li><a href="#" data-page="settings">Settings</a></li>
             </ul>
             <div class="nav-profile">
@@ -138,19 +139,52 @@
         </div>
     </div>
 
-    <!-- ========== PAGE: ANALYTICS ========== -->
-    <div id="page-analytics" class="page-view">
-        <div class="container glass-panel" style="max-width: 1200px; width: 90vw;">
-            <header
-                style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 20px; margin-bottom: 20px;">
-                <h1 style="margin-bottom: 0;">Purchase Analysis</h1>
-                <p id="analytics-status" style="color: var(--text-secondary); font-weight: 600;">Ready</p>
+    <!-- ========== PAGE: VOICE ASSISTANT ========== -->
+    <div id="page-voice" class="page-view">
+        <div class="container glass-panel"
+            style="max-width: 800px; width: 90vw; height: 70vh; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 40px;">
+            <header style="text-align: center;">
+                <h1 style="font-size: 2.5rem; margin-bottom: 20px;">Talk to Orion</h1>
+                <p id="voice-status" style="color: var(--text-secondary); font-size: 1.1rem;">Click the microphone to
+                    start talking</p>
             </header>
-            <div id="analytics-content" style="grid-column: 1 / -1;">
-                <div class="loading-state" style="text-align: center; padding: 50px; color: var(--text-secondary);">
-                    Use the Orion Analyst browser extension on any product page to analyze a purchase.
+
+            <div class="voice-ui-container"
+                style="position: relative; display: flex; justify-content: center; align-items: center;">
+                <div id="voice-visualizer" class="visualizer"
+                    style="position: absolute; width: 120px; height: 120px; border-radius: 50%; border: 2px solid var(--accent-primary); opacity: 0; transition: all 0.3s ease;">
                 </div>
+                <button id="record-btn" class="btn"
+                    style="width: 80px; height: 80px; border-radius: 50%; padding: 0; display: flex; justify-content: center; align-items: center; z-index: 10;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                        <line x1="8" y1="23" x2="16" y2="23"></line>
+                    </svg>
+                </button>
             </div>
+
+            <div id="voice-transcript"
+                style="max-width: 600px; text-align: center; font-style: italic; color: var(--text-secondary); min-height: 1.5em;">
+            </div>
+
+            <!-- Text Fallback UI -->
+            <div id="text-fallback" style="width: 100%; max-width: 600px; display: flex; gap: 10px; margin-top: 10px;">
+                <input type="text" id="text-input" placeholder="Or type your message here..."
+                    style="flex-grow: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 12px; padding: 12px 20px; color: white; outline: none; transition: border-color 0.3s;">
+                <button id="text-send-btn" class="btn" style="padding: 0 25px;">Send</button>
+                <button id="scan-screen-btn" class="btn" style="padding: 0 25px; background: var(--accent-income);">Scan
+                    Screen</button>
+            </div>
+
+            <div id="agent-response-container" class="glass-panel"
+                style="max-width: 600px; padding: 20px; visibility: hidden; opacity: 0; transition: opacity 0.5s ease; background: rgba(99, 102, 241, 0.1); border: 1px solid var(--accent-primary);">
+                <p id="agent-response-text" style="line-height: 1.6;"></p>
+            </div>
+
+            <audio id="agent-audio" style="display: none;"></audio>
         </div>
     </div>
 

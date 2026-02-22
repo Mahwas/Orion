@@ -725,6 +725,233 @@ function renderData(users) {
     dataContent.innerHTML = html;
 }
 
+
+// =============================================
+// Voice Assistant Logic
+// =============================================
+const recordBtn = document.getElementById('record-btn');
+const voiceStatus = document.getElementById('voice-status');
+const voiceTranscript = document.getElementById('voice-transcript');
+const agentResponseContainer = document.getElementById('agent-response-container');
+const agentResponseText = document.getElementById('agent-response-text');
+const voiceVisualizer = document.getElementById('voice-visualizer');
+const agentAudio = document.getElementById('agent-audio');
+
+let recognition;
+if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+        voiceStatus.innerText = "Listening...";
+        recordBtn.classList.add('recording');
+        voiceVisualizer.classList.add('active');
+        agentResponseContainer.style.visibility = "hidden";
+        agentResponseContainer.style.opacity = "0";
+    };
+
+    recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+            .map(result => result[0])
+            .map(result => result.transcript)
+            .join('');
+        voiceTranscript.innerText = transcript;
+    };
+
+    recognition.onend = () => {
+        voiceStatus.innerText = "Thinking...";
+        recordBtn.classList.remove('recording');
+        voiceVisualizer.classList.remove('active');
+
+        const finalTranscript = voiceTranscript.innerText;
+        if (finalTranscript.trim()) {
+            sendVoiceQuery(finalTranscript);
+        } else {
+            voiceStatus.innerText = "Click the microphone to start talking";
+        }
+    };
+
+    recognition.onerror = (event) => {
+        console.error("Speech recognition error", event.error);
+        recordBtn.classList.remove('recording');
+        voiceVisualizer.classList.remove('active');
+
+        let message = "Error: " + event.error;
+        if (event.error === 'service-not-allowed') {
+            message = "Permission Denied: Ensure your browser and OS allow microphone access. (Check System Settings > Privacy > Microphone)";
+        } else if (event.error === 'not-allowed') {
+            message = "Microphone access blocked. Please enable it in your browser address bar.";
+        } else if (event.error === 'no-speech') {
+            message = "No speech detected. Try again!";
+        }
+
+        voiceStatus.innerText = message;
+        voiceStatus.style.color = "var(--accent-expense)";
+    };
+}
+
+async function sendVoiceQuery(text) {
+    try {
+        const response = await fetch(`${API_BASE}/voice-reply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: "1",
+                text: text,
+                thread_id: "demo_session"
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || "Failed to get response from Orion");
+        }
+
+        const data = await response.json();
+
+        // Show text response
+        agentResponseText.innerText = data.text;
+        agentResponseContainer.style.visibility = "visible";
+        agentResponseContainer.style.opacity = "1";
+        voiceStatus.innerText = "Orion is speaking...";
+
+        // Play audio response
+        if (data.audio) {
+            agentAudio.src = `data:audio/mpeg;base64,${data.audio}`;
+            agentAudio.play();
+            agentAudio.onended = () => {
+                voiceStatus.innerText = "Click the microphone to start talking";
+            };
+        } else {
+            voiceStatus.innerText = "Click the microphone to start talking";
+        }
+
+    } catch (error) {
+        console.error("Voice query error:", error);
+        voiceStatus.innerText = "Error: " + error.message;
+        voiceStatus.style.color = "var(--accent-expense)";
+    }
+}
+
+// Text Fallback Logic
+// Text Fallback Logic
+const textInput = document.getElementById('text-input');
+const textSendBtn = document.getElementById('text-send-btn');
+
+// "Unlock" audio for browser autoplay policies
+function unlockAudio() {
+    if (agentAudio) {
+        // Playing then immediately pausing satisfies the "user gesture" requirement
+        agentAudio.play().then(() => {
+            agentAudio.pause();
+            agentAudio.currentTime = 0;
+        }).catch(e => {
+            console.log("Audio unlock attempted");
+        });
+    }
+}
+
+async function handleTextSubmit() {
+    unlockAudio();
+    const text = textInput.value.trim();
+    if (!text) return;
+
+    // Clear input and show status
+    textInput.value = "";
+    voiceTranscript.innerText = text;
+    voiceStatus.innerText = "Thinking...";
+    voiceStatus.style.color = "var(--text-secondary)";
+
+    await sendVoiceQuery(text);
+}
+
+if (textSendBtn) {
+    textSendBtn.addEventListener('click', handleTextSubmit);
+}
+
+const scanScreenBtn = document.getElementById('scan-screen-btn');
+
+async function handleScanScreen() {
+    unlockAudio();
+    voiceStatus.innerText = "Scanning screen...";
+    voiceStatus.style.color = "var(--accent-income)";
+    voiceTranscript.innerText = "[Screen Capture Protocol Active]";
+
+    try {
+        const response = await fetch(`${API_BASE}/analyze-screen`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: "1",
+                text: "Analyze my screen",
+                thread_id: "demo_session"
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || "Failed to scan screen");
+        }
+
+        const data = await response.json();
+
+        // Show product info if found
+        if (data.product_found) {
+            voiceTranscript.innerText = `I found: ${data.product_found.product_title} ($${data.product_found.price})`;
+        } else {
+            voiceTranscript.innerText = "I didn't find a specific product, but I'm analyzing your screen...";
+        }
+
+        // Show text response
+        agentResponseText.innerText = data.text;
+        agentResponseContainer.style.visibility = "visible";
+        agentResponseContainer.style.opacity = "1";
+        voiceStatus.innerText = "Orion is speaking...";
+
+        // Play audio response
+        if (data.audio) {
+            agentAudio.src = `data:audio/mpeg;base64,${data.audio}`;
+            agentAudio.play();
+            agentAudio.onended = () => {
+                voiceStatus.innerText = "Click the microphone to start talking";
+            };
+        } else {
+            voiceStatus.innerText = "Click the microphone to start talking";
+        }
+
+    } catch (error) {
+        console.error("Screen scan error:", error);
+        voiceStatus.innerText = "Error: " + error.message;
+        voiceStatus.style.color = "var(--accent-expense)";
+    }
+}
+
+if (scanScreenBtn) {
+    scanScreenBtn.addEventListener('click', handleScanScreen);
+}
+
+if (textInput) {
+    textInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            handleTextSubmit();
+        }
+    });
+}
+
+if (recordBtn) {
+    recordBtn.addEventListener('click', () => {
+        unlockAudio();
+        if (recordBtn.classList.contains('recording')) {
+            recognition.stop();
+        } else {
+            voiceTranscript.innerText = "";
+            recognition.start();
+        }
+    });
+}
+
 // =============================================
 // Boot
 // =============================================

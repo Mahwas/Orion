@@ -9,7 +9,10 @@ from database import get_db
 from models.orm import User, BankAccount, Transaction
 from models.schemas import UserData, ProductData, AnalysisResult
 from models.db_models import StripeTransaction, StripeUser, Entitlement
-from core.agent import execute_agent
+from core.agent import execute_agent, capture_screen, extract_product_from_image
+from services.voice_service import synthesize_speech
+import base64
+from langchain_core.messages import HumanMessage
 
 router = APIRouter()
 
@@ -21,6 +24,11 @@ class BankAccountCreate(BaseModel):
 class AnalyzeRequest(BaseModel):
     user_data: UserData
     product_data: ProductData
+
+class VoiceReplyRequest(BaseModel):
+    user_id: str
+    text: str
+    thread_id: Optional[str] = "default"
 
 @router.post("/analyze", response_model=AnalysisResult)
 async def analyze_purchase(payload: AnalyzeRequest, db: AsyncSession = Depends(get_db)):
@@ -94,6 +102,131 @@ async def analyze_purchase_demo(payload: AnalyzeRequest, db: AsyncSession = Depe
     await db.commit()
 
     return result
+
+@router.post("/voice-reply")
+async def voice_reply(payload: VoiceReplyRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Handles user text/voice input, runs the agent, and returns text + voice response.
+    """
+    # 1. Fetch user data for context
+    # (Simplified for the demo: fetching all data and picking the first user)
+    users_result = await db.execute(
+        select(User).where(User.id == 1).options(
+            selectinload(User.accounts).selectinload(BankAccount.transactions)
+        )
+    )
+    user = users_result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Map DB user to UserData schema
+    user_data = UserData(
+        user_id=str(user.id),
+        monthly_income=5000.0, # Placeholder
+        current_balance=sum(acc.balance for acc in user.accounts),
+        transactions=[
+            {
+                "id": str(tx.id),
+                "date": tx.timestamp.isoformat()[:10],
+                "merchant": tx.merchant,
+                "amount": tx.amount,
+                "category": tx.category,
+                "is_recurring": False
+            }
+            for acc in user.accounts for tx in acc.transactions
+        ]
+    )
+
+    # 2. Execute Agent with memory
+    messages = [HumanMessage(content=payload.text)]
+    result = await execute_agent(user_data, messages=messages, thread_id=payload.thread_id)
+    
+    # 3. Synthesize speech
+    audio_content = await synthesize_speech(result.reasoning)
+    audio_base64 = base64.b64encode(audio_content).decode('utf-8') if audio_content else None
+
+    return {
+        "text": result.reasoning,
+        "audio": audio_base64
+    }
+
+@router.post("/analyze-screen")
+async def analyze_screen(payload: VoiceReplyRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Captures a screenshot, extracts product info via Gemini Vision, 
+    and then runs the full analysis agent. Returns JSON + Vocal response.
+    """
+    # 1. Capture and extract
+    screenshot_path = await capture_screen()
+    product_data = await extract_product_from_image(screenshot_path)
+    
+    if not product_data:
+        # Fallback to standard voice chat if no product is found on screen
+        messages = [HumanMessage(content="I'm looking at my screen, what do you see?")]
+        # Fetch user data (reusing logic from voice_reply)
+        users_result = await db.execute(
+            select(User).where(User.id == 1).options(
+                selectinload(User.accounts).selectinload(BankAccount.transactions)
+            )
+        )
+        user = users_result.scalar_one_or_none()
+        user_data = UserData(
+            user_id="1",
+            monthly_income=5000.0,
+            current_balance=sum(acc.balance for acc in user.accounts),
+            transactions=[
+                {
+                    "id": str(tx.id),
+                    "date": tx.timestamp.isoformat()[:10],
+                    "merchant": tx.merchant,
+                    "amount": tx.amount,
+                    "category": tx.category,
+                    "is_recurring": False
+                }
+                for acc in user.accounts for tx in acc.transactions
+            ]
+        )
+        result = await execute_agent(user_data, messages=messages, thread_id=payload.thread_id)
+    else:
+        # 2. Run analysis agent with found product
+        # Fetch user data
+        users_result = await db.execute(
+            select(User).where(User.id == 1).options(
+                selectinload(User.accounts).selectinload(BankAccount.transactions)
+            )
+        )
+        user = users_result.scalar_one_or_none()
+        user_data = UserData(
+            user_id="1",
+            monthly_income=5000.0,
+            current_balance=sum(acc.balance for acc in user.accounts),
+            transactions=[
+                {
+                    "id": str(tx.id),
+                    "date": tx.timestamp.isoformat()[:10],
+                    "merchant": tx.merchant,
+                    "amount": tx.amount,
+                    "category": tx.category,
+                    "is_recurring": False
+                }
+                for acc in user.accounts for tx in acc.transactions
+            ]
+        )
+        
+        # Add a message to the agent context explaining we found this on screen
+        messages = [HumanMessage(content=f"I just scanned my screen and found this: {product_data.product_title} for ${product_data.price}. Should I buy it?")]
+        result = await execute_agent(user_data, product=product_data, messages=messages, thread_id=payload.thread_id)
+
+    # 3. Synthesize speech
+    audio_content = await synthesize_speech(result.reasoning)
+    audio_base64 = base64.b64encode(audio_content).decode('utf-8') if audio_content else None
+
+    return {
+        "text": result.reasoning,
+        "audio": audio_base64,
+        "product_found": product_data.model_dump() if product_data else None
+    }
 
 @router.get("/transactions/{user_id}")
 async def get_user_transactions(user_id: str, db: AsyncSession = Depends(get_db)):
