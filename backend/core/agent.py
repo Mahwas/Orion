@@ -7,13 +7,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, END
 from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_community.utilities import SerpAPIWrapper
-<<<<<<< HEAD
 from models.schemas import UserData, ProductData, AnalysisResult, AlternativeProduct
 from core.prompts import (
-=======
-from backend.models.schemas import UserData, ProductData, AnalysisResult, AlternativeProduct
-from backend.core.prompts import (
->>>>>>> origin/feature/reasoningLLM
     TRIAGE_SYSTEM_PROMPT,
     EVALUATE_PROMPT,
     COMPARE_PROMPT,
